@@ -5,26 +5,29 @@
 #![allow(unused)]
 
 extern crate nom;
-#[macro_use] extern crate im;
-#[macro_use] extern crate lazy_static;
-#[macro_use] extern crate clap;
+#[macro_use]
+extern crate im;
+#[macro_use]
+extern crate lazy_static;
+#[macro_use]
+extern crate clap;
 
 mod data;
-mod parse;
-mod mixfix;
-mod lex;
 mod interp;
+mod lex;
+mod mixfix;
+mod parse;
 
-use std::fs;
-use data::*;
 use clap::Clap;
+use data::*;
+use std::fs;
 
 fn main() {
     parse::init_p_expr();
 
-    let env: Env = vec![
-        ("print".into(), Value::PrimV("print".into()))
-    ].into_iter().collect();
+    let env: Env = vec![("print".into(), Value::PrimV("print".into()))]
+        .into_iter()
+        .collect();
 
     println!("{:?}", interp_from_file("./examples/ex01.juni"));
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));

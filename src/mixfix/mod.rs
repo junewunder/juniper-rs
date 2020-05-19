@@ -1,2 +1,2 @@
-pub mod mixfix;
 pub mod combinator;
+pub mod mixfix;

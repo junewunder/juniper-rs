@@ -1,5 +1,5 @@
-use std::rc::Rc;
 use im::hashmap::HashMap;
+use std::rc::Rc;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
@@ -21,19 +21,18 @@ pub enum Expr {
     FnE(String, Box<Expr>),
     AppE(Box<Expr>, Box<Expr>),
     AppPrimE(String, Vec<String>),
-    SeqE(Box<Expr>, Box<Expr>)
-    // BoxE(Expr),
-    // UnboxE(Expr),
-    // AssignE(Expr, Expr),
-    // ClassE(Vec<String>, Vec<(String, Expr)>),
-    // NewE(Expr, Vec<(String, Expr)>),
-    // AccessE(Expr, String)
+    SeqE(Box<Expr>, Box<Expr>), // BoxE(Expr),
+                                // UnboxE(Expr),
+                                // AssignE(Expr, Expr),
+                                // ClassE(Vec<String>, Vec<(String, Expr)>),
+                                // NewE(Expr, Vec<(String, Expr)>),
+                                // AccessE(Expr, String)
 }
 
 #[derive(Debug)]
 pub enum Defn {
     FnD(String, String, Box<Expr>),
-    PrimD(String, Vec<String>)
+    PrimD(String, Vec<String>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -44,10 +43,10 @@ pub enum Value {
     PrimV(String),
     Null,
 }
-  // | LocV Integer
-  // | ClassV [String] [(String, Expr)] Env
-  // | ObjectV (Map String Integer) (Map String Expr) Env
-  // deriving (Eq,Ord,Show)
+// | LocV Integer
+// | ClassV [String] [(String, Expr)] Env
+// | ObjectV (Map String Integer) (Map String Expr) Env
+// deriving (Eq,Ord,Show)
 
 pub type Env = HashMap<String, Value>;
 

@@ -1,11 +1,14 @@
-use std::rc::Rc;
 use crate::mixfix::mixfix::*;
+use std::rc::Rc;
 
 pub fn bin_op<I, IO, O>(
     p: impl Parser<I, IO> + 'static,
-    f: Box<dyn BinOp<O>>
+    f: Box<dyn BinOp<O>>,
 ) -> Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>
-where I: Clone + 'static, O: Clone + 'static {
+where
+    I: Clone + 'static,
+    O: Clone + 'static,
+{
     let f = Rc::new(f);
     Rc::new(box move |input: I| {
         let f = f.clone();
@@ -16,9 +19,12 @@ where I: Clone + 'static, O: Clone + 'static {
 
 pub fn un_op<I, IO, O>(
     p: impl Parser<I, IO> + 'static,
-    f: Box<dyn UnOp<O>>
+    f: Box<dyn UnOp<O>>,
 ) -> Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>>>>
-where I: Clone + 'static, O: Clone + 'static {
+where
+    I: Clone + 'static,
+    O: Clone + 'static,
+{
     let f = Rc::new(f);
     Rc::new(box move |input: I| {
         let f = f.clone();
