@@ -13,7 +13,7 @@ use nom::Err;
 use nom::InputIter;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_till},
+    bytes::complete::{escaped_transform, is_not, tag, take_till, take_until},
     character::complete::space1,
     multi::{fold_many0, many0},
     whitespace, IResult,
@@ -27,6 +27,7 @@ pub enum Token {
     Keywd(String),
     Op(String),
     Prim(String),
+    Str(String),
     Space,
     Num(f64),
     Comment,
@@ -34,20 +35,14 @@ pub enum Token {
 }
 
 pub fn lex(input: &str) -> IResult<&str, TokenBuffer> {
-    let (input, tokbuf) = fold_many0(
-        alt((
-            map(p_comment, |_| Token::Comment),
-            p_reserved,
-            p_ident,
-            map(is_a(" \t\n\r"), |x| Token::Space),
-            map(double, |i| Token::Num(i)),
-        )),
-        Vec::new(),
-        |mut acc: Vec<_>, tok| {
-            acc.push(tok);
-            acc
-        },
-    )(input)?;
+    let (input, tokbuf) = many0(alt((
+        map(p_comment, |_| Token::Comment),
+        p_string,
+        p_reserved,
+        p_ident,
+        map(is_a(" \t\n\r"), |x| Token::Space),
+        map(double, |i| Token::Num(i)),
+    )))(input)?;
 
     let tokbuf = tokbuf
         .into_iter()
@@ -104,6 +99,28 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
     );
 
     alt(reserved)(input)
+}
+
+#[test]
+fn test_string() {
+    p_string(r#""hellooo""#);
+}
+
+pub fn p_string(input: &str) -> IResult<&str, Token> {
+    let (input, _) = tag("\"")(input)?;
+    let (input, contents) = escaped_transform(is_not("\t\r\n\""), '\\', |i: &str| {
+        alt((
+            map(tag("\\"), |_| "\\"),
+            map(tag("\""), |_| "\""),
+            map(tag("n"), |_| "\n"),
+            // map(tag("\\\\"), |_| "\\"),
+            // map(tag("\\\""), |_| "\""),
+            // map(tag("\\n"),  |_| "\n"),
+        ))(i)
+    })(input)?;
+    let (input, _) = tag("\"")(input)?;
+
+    Ok((input, Token::Str(contents.into())))
 }
 
 pub fn p_ident(input: &str) -> IResult<&str, Token> {

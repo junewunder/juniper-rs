@@ -16,18 +16,21 @@ pub enum Expr {
     LtE(Box<Expr>, Box<Expr>),
     GtE(Box<Expr>, Box<Expr>),
     IfE(Box<Expr>, Box<Expr>, Box<Expr>),
+    StringE(String),
     VarE(String),
     LetE(String, Box<Expr>, Box<Expr>),
     FnE(String, Box<Expr>),
     AppE(Box<Expr>, Box<Expr>),
     AppPrimE(String, Vec<String>),
-    SeqE(Box<Expr>, Box<Expr>), // BoxE(Expr),
-                                // UnboxE(Expr),
-                                // AssignE(Expr, Expr),
-                                // ClassE(Vec<String>, Vec<(String, Expr)>),
-                                // NewE(Expr, Vec<(String, Expr)>),
-                                // AccessE(Expr, String)
+    SeqE(Box<Expr>, Box<Expr>),
 }
+// TODO:
+// BoxE(Expr),
+// UnboxE(Expr),
+// AssignE(Expr, Expr),
+// ClassE(Vec<String>, Vec<(String, Expr)>),
+// NewE(Expr, Vec<(String, Expr)>),
+// AccessE(Expr, String)
 
 #[derive(Debug)]
 pub enum Defn {
@@ -39,8 +42,9 @@ pub enum Defn {
 pub enum Value {
     NumV(f64),
     BoolV(bool),
-    CloV(Option<String>, String, Box<Expr>, Rc<Env>),
+    StringV(String),
     PrimV(String),
+    CloV(Option<String>, String, Box<Expr>, Rc<Env>),
     Null,
 }
 // | LocV Integer

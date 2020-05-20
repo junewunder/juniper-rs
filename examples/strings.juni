@@ -1,0 +1,8 @@
+prim print :: x
+
+fn greet :: greeting => name =>
+  print (greeting + ", " + name);
+
+fn main :: x =>
+  let sayHello = greet "Hello"
+  in sayHello "June";

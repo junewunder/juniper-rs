@@ -59,6 +59,7 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
         NumE(i) => Some(NumV(i)),
         PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Some(NumV(i1 + i2)),
+            (StringV(s1), StringV(s2)) => Some(StringV(s1 + &s2)),
             _ => None,
         },
         MinusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
@@ -104,6 +105,7 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             BoolV(false) => interp(els, env),
             _ => None,
         },
+        StringE(s) => Some(Value::StringV(s)),
         VarE(x) => env.get(&x).cloned().or_else(|| Some(Null)),
         LetE(x, e, body) => {
             let v = interp(e, env)?;
@@ -118,7 +120,7 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             (CloV(_, arg, body, mut local_env), arg_v) => {
                 interp(body, &local_env.update(arg, arg_v))
             }
-            (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]), // TODO: remove
+            (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]),
             _ => None,
         },
         AppPrimE(f, xs) => {

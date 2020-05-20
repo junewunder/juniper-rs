@@ -3,27 +3,23 @@ use crate::data::Defn;
 use crate::data::Expr::{self, *};
 use crate::lex::take_ident;
 use crate::lex::ttag;
-use crate::mixfix::combinator::bin_op;
-use crate::mixfix::combinator::un_op;
-use crate::mixfix::mixfix::Mixes;
+use crate::mixfix::{
+    combinator::{bin_op, un_op},
+    mixfix::Mixes,
+};
 use core::fmt::Error;
-use nom::combinator::map;
-use nom::error::{ErrorKind, ParseError};
-use nom::multi::many0;
-use nom::multi::many1;
-use nom::multi::separated_list;
-use nom::multi::separated_nonempty_list;
-use nom::Err;
 use nom::{
     self,
     branch::alt,
     bytes::complete::take_until,
     character::complete::{alpha1, char, space0, space1},
+    combinator::map,
     combinator::{complete, not, peek},
-    multi::fold_many0,
+    error::{ErrorKind, ParseError},
+    multi::{fold_many0, many0, many1, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
-    IResult,
+    Err, IResult,
 };
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -240,7 +236,7 @@ pub fn p_expr(input: TokenBuffer) -> ExprIResult {
 }
 
 fn p_terminals(input: TokenBuffer) -> ExprIResult {
-    alt((p_var, p_num, p_bool, p_parens))(input)
+    alt((p_var, p_num, p_bool, p_string, p_parens))(input)
 }
 
 fn p_var(input: TokenBuffer) -> ExprIResult {
@@ -261,6 +257,22 @@ fn p_num(input: TokenBuffer) -> ExprIResult {
     };
 
     let e: ErrorKind = ErrorKind::Float;
+    Err(Err::Error(ParseError::from_error_kind(input, e)))
+}
+
+fn p_string(input: TokenBuffer) -> ExprIResult {
+    let mut input = input.clone();
+
+    if input.len() == 0 {
+        let e: ErrorKind = ErrorKind::Tag;
+        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+    };
+
+    if let Str(string) = input.remove(0) {
+        return Ok((input, box StringE(string)));
+    };
+
+    let e: ErrorKind = ErrorKind::Tag;
     Err(Err::Error(ParseError::from_error_kind(input, e)))
 }
 
