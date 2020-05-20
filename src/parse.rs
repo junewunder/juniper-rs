@@ -3,23 +3,21 @@ use crate::data::Defn;
 use crate::data::Expr::{self, *};
 use crate::lex::take_ident;
 use crate::lex::ttag;
-use crate::mixfix::{
-    combinator::{bin_op, un_op},
-    mixfix::Mixes,
-};
+use crate::mixfix::{combinator::{bin_op, un_op}, mixfix::Mixes};
 use core::fmt::Error;
 use nom::{
     self,
+    Err,
+    error::{ErrorKind, ParseError},
     branch::alt,
     bytes::complete::take_until,
-    character::complete::{alpha1, char, space0, space1},
     combinator::map,
+    character::complete::{alpha1, char, space0, space1},
     combinator::{complete, not, peek},
-    error::{ErrorKind, ParseError},
     multi::{fold_many0, many0, many1, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
-    Err, IResult,
+    IResult,
 };
 use std::collections::HashMap;
 use std::rc::Rc;

@@ -53,7 +53,6 @@ fn interp_fn_defs(denv: DefEnv, def: Defn) -> DefEnv {
 pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
     use Expr::*;
     use Value::*;
-    // println!("{:?}", env.get("print".into()));
     let interp = interp_expr;
     match *e {
         NumE(i) => Some(NumV(i)),

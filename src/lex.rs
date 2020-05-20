@@ -7,6 +7,7 @@ use nom::character::complete::newline;
 use nom::character::complete::space0;
 use nom::combinator::map;
 use nom::combinator::not;
+use nom::combinator::value;
 use nom::error::{ErrorKind, ParseError};
 use nom::number::complete::double;
 use nom::Err;
@@ -103,21 +104,27 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
 
 #[test]
 fn test_string() {
-    p_string(r#""hellooo""#);
+    // println!("{:?}", p_string(r#""hellooo" + x"#));
+    println!("{:?}", p_string(r#""Xbeep" + x"#));
 }
 
 pub fn p_string(input: &str) -> IResult<&str, Token> {
     let (input, _) = tag("\"")(input)?;
-    let (input, contents) = escaped_transform(is_not("\t\r\n\""), '\\', |i: &str| {
-        alt((
-            map(tag("\\"), |_| "\\"),
-            map(tag("\""), |_| "\""),
-            map(tag("n"), |_| "\n"),
-            // map(tag("\\\\"), |_| "\\"),
-            // map(tag("\\\""), |_| "\""),
-            // map(tag("\\n"),  |_| "\n"),
-        ))(i)
-    })(input)?;
+    let (input, contents) = escaped_transform( // TODO: why is this NOT working
+        is_not("\r\n\""),
+        '\\',
+        |i: &str| {
+            println!("INPUT TO TRANSXFORM{:?}", i);
+            let r = alt((
+                value("florp", tag("beep")),
+                value("\\", tag("\\")),
+                value("\"", tag("\"")),
+                value("n", tag("\n")),
+            ))(i);
+            println!("RESULT {:?}", r);
+            r
+        }
+    )(input)?;
     let (input, _) = tag("\"")(input)?;
 
     Ok((input, Token::Str(contents.into())))
