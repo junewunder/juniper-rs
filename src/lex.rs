@@ -8,6 +8,7 @@ use nom::character::complete::space0;
 use nom::combinator::map;
 use nom::combinator::not;
 use nom::combinator::value;
+use nom::combinator::opt;
 use nom::error::{ErrorKind, ParseError};
 use nom::number::complete::double;
 use nom::Err;
@@ -67,7 +68,9 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("if"),
                 tag("then"),
                 tag("else"),
+                tag("while"),
                 tag("let"),
+                tag("mut"),
                 tag("in"),
                 tag("fn"),
                 tag("prim"),
@@ -83,6 +86,7 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("&&"),
                 tag("||"),
                 tag("=="),
+                tag("!"),
                 tag("<"),
                 tag(">"),
                 tag("="),
@@ -110,7 +114,7 @@ fn test_string() {
 
 pub fn p_string(input: &str) -> IResult<&str, Token> {
     let (input, _) = tag("\"")(input)?;
-    let (input, contents) = escaped_transform( // TODO: why is this NOT working
+    let (input, contents) = opt(escaped_transform( // TODO: why is this NOT working
         is_not("\r\n\""),
         '\\',
         |i: &str| {
@@ -124,15 +128,15 @@ pub fn p_string(input: &str) -> IResult<&str, Token> {
             println!("RESULT {:?}", r);
             r
         }
-    )(input)?;
+    ))(input)?;
     let (input, _) = tag("\"")(input)?;
 
-    Ok((input, Token::Str(contents.into())))
+    Ok((input, Token::Str(contents.unwrap_or(String::new()).into())))
 }
 
 pub fn p_ident(input: &str) -> IResult<&str, Token> {
     let (input, _) = not(p_reserved)(input)?;
-    let (input, x) = alpha1(input)?;
+    let (input, x) = alt((alpha1, is_a("_")))(input)?;
     Ok((input, Token::Ident(x.to_string())))
 }
 

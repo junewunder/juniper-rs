@@ -1,0 +1,17 @@
+prim print :: x
+prim delay :: x
+
+fn main :: arg =>
+  mut i = 0 in
+  mut numbers = "1..10 = " in (
+    while (*i) < 10 => (
+      print "looping";
+      print ("i = " + i);
+      !i = (*i) + 1;
+      !numbers = *numbers + (if *i > 1 then ", " else "") + *i;
+      print ("i = " + i);
+      delay 100
+    );
+    print "hello?";
+    numbers
+  )
