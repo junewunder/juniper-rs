@@ -29,7 +29,7 @@ fn main() {
         .into_iter()
         .collect();
 
-    println!("{:?}", interp_from_file("./examples/strings.juni"));
+    println!("{}", interp_from_file("./examples/loop.juni").unwrap_or(Value::StringV("null".into())));
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));
     // println!("{:?}", fully_interp_expr("print -1; true", &env));
     // println!("{:?}", fully_interp_expr("let foo = 1 in let bar = 2 in foo", &env));

@@ -7,7 +7,8 @@ type DefEnv = HashMap<String, (String, Box<Expr>)>;
 
 pub fn interp_program(defs: Vec<Defn>) -> Option<Value> {
     let mut env_init: Env = vec![
-        // ("print".into(), Value::PrimV("print".into()))
+        ("delay".into(), Value::PrimV("delay".into())),
+        ("print".into(), Value::PrimV("print".into())),
     ]
     .into_iter()
     .collect();
@@ -54,11 +55,15 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
     use Expr::*;
     use Value::*;
     let interp = interp_expr;
+    // println!("{:?}", e);
     match *e {
         NumE(i) => Some(NumV(i)),
         PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Some(NumV(i1 + i2)),
             (StringV(s1), StringV(s2)) => Some(StringV(s1 + &s2)),
+            (StringV(s1), NumV(s2)) => Some(StringV(s1 + &s2.to_string())),
+            (StringV(s1), BoolV(s2)) => Some(StringV(s1 + &s2.to_string())),
+            (StringV(s1), MutV(s2)) => Some(StringV(s1 + &(*s2.borrow().clone()).to_string())),
             _ => None,
         },
         MinusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
@@ -74,7 +79,8 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             _ => None,
         },
         LtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
-            (NumV(i1), NumV(i2)) => Some(BoolV(i1 < i2)),
+            (NumV(i1), NumV(i2)) => {
+                Some(BoolV(i1 < i2))},
             _ => None,
         },
         GtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
@@ -111,6 +117,33 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             let next_env = env.update(x, v);
             interp(body, &next_env)
         }
+        MutableE(x, e, body) => {
+            let v = interp(e, env)?;
+            let v = MutV(Rc::new(RefCell::new(Box::new(v))));
+            let next_env = env.update(x, v);
+            interp(body, &next_env)
+        }
+        MutateE(xe, e) => {
+            // println!("HELLOOOOOO");
+            // println!("interp {:?}", e);
+            let v = interp(e, env)?;
+            // println!("next value: {:?}", v);
+            // println!("xe: {:?} = {:?}", xe, interp(xe.clone(), env)?);
+            if let MutV(x) = interp(xe, env)? {
+                // println!("x: {:?}", x);
+                x.replace(Box::new(v));
+                // println!("x: {:?}", x);
+                // println!("env: {:?}", env.get("i".into()));
+            }
+            None
+        }
+        UnboxE(e) => {
+            let v = interp(e, env)?;
+            match v {
+                MutV(cell) => Some(*cell.borrow().clone()),
+                _ => Some(v)
+            }
+        },
         SeqE(e1, e2) => match (interp(e1, env), interp(e2, env)) {
             (_, v2) => v2,
         },
@@ -125,6 +158,20 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
         AppPrimE(f, xs) => {
             interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
         }
+        WhileE(pred, body) => {
+            let continue_loop = |pred: Box<Expr>, env: &Env|
+                match interp_expr(pred, env) {
+                    Some(Value::BoolV(b)) => b,
+                    _ => false,
+                };
+
+            // TODO: This seems a little extreme to CLONE the pred and body every time
+            // use Rc for exprs???
+            while continue_loop(pred.clone(), env) {
+                interp_expr(body.clone(), env);
+            }
+            Some(Value::Null)
+        }
         _ => None,
     }
 }
@@ -133,8 +180,20 @@ fn interp_prim(name: String, values: Vec<Value>) -> Option<Value> {
     use Value::*;
     match name.as_str() {
         "print" => {
-            println!("{:?}", values.get(0));
+            if let Some(v) = values.get(0) {
+                println!("{}", v);
+            } else { println!("{:?}", None as Option<u32>); }
             Some(PrimV("print".into()))
+        }
+        "delay" => {
+            use std::{thread, time};
+            if let Some(NumV(n)) = values.get(0) {
+                let ten_millis = time::Duration::from_millis(*n as u64);
+                thread::sleep(ten_millis);
+                Some(Null)
+            } else {
+                None
+            }
         }
         _ => Some(Null),
     }

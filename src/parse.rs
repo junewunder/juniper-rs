@@ -26,9 +26,11 @@ lazy_static! {
     static ref T_IF: Token = Keywd("if".into());
     static ref T_THN: Token = Keywd("then".into());
     static ref T_ELS: Token = Keywd("else".into());
+    static ref T_WHILE: Token = Keywd("while".into());
     static ref T_TRUE: Token = Prim("true".into());
     static ref T_FALSE: Token = Prim("false".into());
     static ref T_LET: Token = Keywd("let".into());
+    static ref T_MUT: Token = Keywd("mut".into());
     static ref T_EQ: Token = Op("=".into());
     static ref T_IN: Token = Keywd("in".into());
     static ref T_FN: Token = Keywd("fn".into());
@@ -43,6 +45,7 @@ lazy_static! {
     static ref T_AND: Token = Op("&&".into());
     static ref T_OR: Token = Op("||".into());
     static ref T_EQEQ: Token = Op("==".into());
+    static ref T_BANG: Token = Op("!".into());
     static ref T_LT: Token = Op("<".into());
     static ref T_GT: Token = Op(">".into());
     static ref T_COLONCOLON: Token = Delim("::".into());
@@ -78,6 +81,7 @@ const P_NEG: usize = 170;
 const P_POW: usize = 180; // todo
 const P_FAC: usize = 190; // todo
 const P_APP: usize = 200; // todo
+const P_UNBOX: usize = 210;
 
 pub fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Expr>> {
     let mut levels: HashMap<usize, Rc<Mixes<TokenBuffer, Box<Expr>>>> = HashMap::new();
@@ -102,7 +106,7 @@ pub fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Expr>> {
     levels.insert(
         P_LET,
         Rc::new(Mixes {
-            prefix: Rc::new(box alt((p_let, p_if))),
+            prefix: Rc::new(box alt((p_let, p_if, p_while, p_mutable, p_mutate))),
             ..Mixes::default()
         }),
     );
@@ -153,6 +157,14 @@ pub fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Expr>> {
         P_APP,
         Rc::new(Mixes {
             infix_l: Rc::new(box p_app),
+            ..Mixes::default()
+        }),
+    );
+
+    levels.insert(
+        P_UNBOX,
+        Rc::new(Mixes {
+            prefix: un_op(ttag(&T_MULT), box |lhs| box UnboxE(lhs)),
             ..Mixes::default()
         }),
     );
@@ -310,6 +322,36 @@ pub fn p_let(input: TokenBuffer) -> UnOpIResult {
     let (input, _) = ttag(&T_IN)(input)?;
     Ok((input, box move |body| {
         box LetE(x.clone(), e.clone(), body.clone())
+    }))
+}
+
+pub fn p_mutable(input: TokenBuffer) -> UnOpIResult {
+    let (input, _) = ttag(&T_MUT)(input)?;
+    let (input, x) = take_ident(input)?;
+    let (input, _) = ttag(&T_EQ)(input)?;
+    let (input, e) = p_expr(input)?;
+    let (input, _) = ttag(&T_IN)(input)?;
+    Ok((input, box move |body| {
+        box MutableE(x.clone(), e.clone(), body.clone())
+    }))
+}
+
+pub fn p_mutate(input: TokenBuffer) -> UnOpIResult {
+    let (input, _) = ttag(&T_BANG)(input)?;
+    let (input, x) = p_expr(input)?;
+    // let (input, x) = take_ident(input)?;
+    let (input, _) = ttag(&T_EQ)(input)?;
+    Ok((input, box move |e| {
+        box MutateE(x.clone(), e.clone())
+    }))
+}
+
+pub fn p_while(input: TokenBuffer) -> UnOpIResult {
+    let (input, _) = ttag(&T_WHILE)(input)?;
+    let (input, pred) = p_expr(input)?;
+    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
+    Ok((input, box move |body| {
+        box WhileE(pred.clone(), body.clone())
     }))
 }
 

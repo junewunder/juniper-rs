@@ -1,5 +1,7 @@
 use im::hashmap::HashMap;
 use std::rc::Rc;
+use std::cell::{RefCell, Ref};
+use std::fmt::{self, Display};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
@@ -9,6 +11,7 @@ pub enum Expr {
     MultE(Box<Expr>, Box<Expr>),
     DivE(Box<Expr>, Box<Expr>),
     NegE(Box<Expr>),
+
     BoolE(bool),
     AndE(Box<Expr>, Box<Expr>),
     OrE(Box<Expr>, Box<Expr>),
@@ -16,18 +19,24 @@ pub enum Expr {
     LtE(Box<Expr>, Box<Expr>),
     GtE(Box<Expr>, Box<Expr>),
     IfE(Box<Expr>, Box<Expr>, Box<Expr>),
+
     StringE(String),
+
     VarE(String),
     LetE(String, Box<Expr>, Box<Expr>),
+
     FnE(String, Box<Expr>),
     AppE(Box<Expr>, Box<Expr>),
     AppPrimE(String, Vec<String>),
+
     SeqE(Box<Expr>, Box<Expr>),
+
+    WhileE(Box<Expr>, Box<Expr>),
+    MutableE(String, Box<Expr>, Box<Expr>),
+    MutateE(Box<Expr>, Box<Expr>),
+    UnboxE(Box<Expr>),
 }
 // TODO:
-// BoxE(Expr),
-// UnboxE(Expr),
-// AssignE(Expr, Expr),
 // ClassE(Vec<String>, Vec<(String, Expr)>),
 // NewE(Expr, Vec<(String, Expr)>),
 // AccessE(Expr, String)
@@ -43,14 +52,32 @@ pub enum Value {
     NumV(f64),
     BoolV(bool),
     StringV(String),
+    MutV(Rc<RefCell<Box<Value>>>),
     PrimV(String),
     CloV(Option<String>, String, Box<Expr>, Rc<Env>),
     Null,
 }
-// | LocV Integer
 // | ClassV [String] [(String, Expr)] Env
 // | ObjectV (Map String Integer) (Map String Expr) Env
 // deriving (Eq,Ord,Show)
+
+impl Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Value::*;
+        match self {
+            NumV(n) => write!(f, "{}", n),
+            BoolV(b) => write!(f, "{}", b),
+            StringV(s) => write!(f, "{}", s),
+            MutV(m) => write!(f, "mut {}", *m.borrow()),
+            PrimV(p) => write!(f, "<prim {}>", p),
+            CloV(name, arg, expr, env) => {
+                let name = name.clone().unwrap_or("anon".to_string());
+                write!(f, "<fn {}>", name)
+            },
+            Null => write!(f, "null")
+        }
+    }
+}
 
 pub type Env = HashMap<String, Value>;
 
