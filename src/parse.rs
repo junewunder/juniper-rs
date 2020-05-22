@@ -262,7 +262,7 @@ fn p_num(input: TokenBuffer) -> ExprIResult {
         return Err(Err::Error(ParseError::from_error_kind(input, e)));
     };
 
-    if let Num(i) = input.remove(0) {
+    if let Num(i) = input.remove(0).tok {
         return Ok((input, box NumE(i)));
     };
 
@@ -278,7 +278,7 @@ fn p_string(input: TokenBuffer) -> ExprIResult {
         return Err(Err::Error(ParseError::from_error_kind(input, e)));
     };
 
-    if let Str(string) = input.remove(0) {
+    if let Str(string) = input.remove(0).tok {
         return Ok((input, box StringE(string)));
     };
 
