@@ -7,8 +7,8 @@ use nom::character::complete::newline;
 use nom::character::complete::space0;
 use nom::combinator::map;
 use nom::combinator::not;
-use nom::combinator::value;
 use nom::combinator::opt;
+use nom::combinator::value;
 use nom::error::{ErrorKind, ParseError};
 use nom::number::complete::double;
 use nom::Err;
@@ -20,8 +20,8 @@ use nom::{
     multi::{fold_many0, many0},
     whitespace, IResult,
 };
-use std::rc::Rc;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 pub type TokenBuffer = Vec<Annotated<Token>>;
 
@@ -31,9 +31,8 @@ struct AnnotationState {
 
 fn annotated(
     state: Rc<RefCell<AnnotationState>>,
-    parser: Box<dyn Fn(&str) -> IResult<&str, Token>>
-) -> impl Fn(&str) -> IResult<&str, Annotated<Token>>
-{
+    parser: Box<dyn Fn(&str) -> IResult<&str, Token>>,
+) -> impl Fn(&str) -> IResult<&str, Annotated<Token>> {
     move |input: &str| {
         let state = state.clone();
         let prev_pos = state.borrow().curr_pos;
@@ -44,11 +43,14 @@ fn annotated(
         let difference = prev_len - input.len();
         state.curr_pos = prev_pos + difference;
 
-        Ok((input, Annotated {
-            tok: result,
-            idx: prev_pos,
-            len: difference,
-        }))
+        Ok((
+            input,
+            Annotated {
+                tok: result,
+                idx: prev_pos,
+                len: difference,
+            },
+        ))
     }
 }
 
@@ -73,18 +75,18 @@ pub enum Token {
 }
 
 pub fn lex(input: &str) -> IResult<&str, TokenBuffer> {
-
     let state = Rc::new(RefCell::new(AnnotationState { curr_pos: 0 }));
 
-    let tokalt: Box<dyn Fn(&str) -> IResult<&str, Token>> =
-        box |i: &str| alt((
+    let tokalt: Box<dyn Fn(&str) -> IResult<&str, Token>> = box |i: &str| {
+        alt((
             map(p_comment, |_| Token::Comment),
             p_string,
             p_reserved,
             p_ident,
             map(is_a(" \t\n\r"), |x| Token::Space),
             map(double, |i| Token::Num(i)),
-        ))(i);
+        ))(i)
+    };
 
     let (input, tokbuf) = many0(annotated(state, tokalt))(input)?;
 
@@ -156,7 +158,8 @@ fn test_string() {
 
 pub fn p_string(input: &str) -> IResult<&str, Token> {
     let (input, _) = tag("\"")(input)?;
-    let (input, contents) = opt(escaped_transform( // TODO: why is this NOT working
+    let (input, contents) = opt(escaped_transform(
+        // TODO: why is this NOT working
         is_not("\r\n\""),
         '\\',
         |i: &str| {
@@ -169,7 +172,7 @@ pub fn p_string(input: &str) -> IResult<&str, Token> {
             ))(i);
             println!("RESULT {:?}", r);
             r
-        }
+        },
     ))(input)?;
     let (input, _) = tag("\"")(input)?;
 

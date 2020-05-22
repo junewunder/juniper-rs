@@ -79,8 +79,7 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             _ => None,
         },
         LtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
-            (NumV(i1), NumV(i2)) => {
-                Some(BoolV(i1 < i2))},
+            (NumV(i1), NumV(i2)) => Some(BoolV(i1 < i2)),
             _ => None,
         },
         GtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
@@ -141,9 +140,9 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             let v = interp(e, env)?;
             match v {
                 MutV(cell) => Some(*cell.borrow().clone()),
-                _ => Some(v)
+                _ => Some(v),
             }
-        },
+        }
         SeqE(e1, e2) => match (interp(e1, env), interp(e2, env)) {
             (_, v2) => v2,
         },
@@ -159,11 +158,10 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
         }
         WhileE(pred, body) => {
-            let continue_loop = |pred: Box<Expr>, env: &Env|
-                match interp_expr(pred, env) {
-                    Some(Value::BoolV(b)) => b,
-                    _ => false,
-                };
+            let continue_loop = |pred: Box<Expr>, env: &Env| match interp_expr(pred, env) {
+                Some(Value::BoolV(b)) => b,
+                _ => false,
+            };
 
             // TODO: This seems a little extreme to CLONE the pred and body every time
             // use Rc for exprs???
@@ -182,7 +180,9 @@ fn interp_prim(name: String, values: Vec<Value>) -> Option<Value> {
         "print" => {
             if let Some(v) = values.get(0) {
                 println!("{}", v);
-            } else { println!("{:?}", None as Option<u32>); }
+            } else {
+                println!("{:?}", None as Option<u32>);
+            }
             Some(PrimV("print".into()))
         }
         "delay" => {

@@ -11,6 +11,5 @@ fn main :: arg =>
       print ("i = " + i);
       delay 100
     );
-    print "hello?";
     numbers
   )

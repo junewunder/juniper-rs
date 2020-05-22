@@ -3,21 +3,23 @@ use crate::data::Defn;
 use crate::data::Expr::{self, *};
 use crate::lex::take_ident;
 use crate::lex::ttag;
-use crate::mixfix::{combinator::{bin_op, un_op}, mixfix::Mixes};
+use crate::mixfix::{
+    combinator::{bin_op, un_op},
+    mixfix::Mixes,
+};
 use core::fmt::Error;
 use nom::{
     self,
-    Err,
-    error::{ErrorKind, ParseError},
     branch::alt,
     bytes::complete::take_until,
-    combinator::map,
     character::complete::{alpha1, char, space0, space1},
+    combinator::map,
     combinator::{complete, not, peek},
+    error::{ErrorKind, ParseError},
     multi::{fold_many0, many0, many1, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
-    IResult,
+    Err, IResult,
 };
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -341,9 +343,7 @@ pub fn p_mutate(input: TokenBuffer) -> UnOpIResult {
     let (input, x) = p_expr(input)?;
     // let (input, x) = take_ident(input)?;
     let (input, _) = ttag(&T_EQ)(input)?;
-    Ok((input, box move |e| {
-        box MutateE(x.clone(), e.clone())
-    }))
+    Ok((input, box move |e| box MutateE(x.clone(), e.clone())))
 }
 
 pub fn p_while(input: TokenBuffer) -> UnOpIResult {

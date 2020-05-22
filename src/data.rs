@@ -1,7 +1,7 @@
 use im::hashmap::HashMap;
-use std::rc::Rc;
-use std::cell::{RefCell, Ref};
+use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display};
+use std::rc::Rc;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
@@ -73,8 +73,8 @@ impl Display for Value {
             CloV(name, arg, expr, env) => {
                 let name = name.clone().unwrap_or("anon".to_string());
                 write!(f, "<fn {}>", name)
-            },
-            Null => write!(f, "null")
+            }
+            Null => write!(f, "null"),
         }
     }
 }
