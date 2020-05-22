@@ -21,6 +21,7 @@ use nom::{
 };
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::cell::RefCell;
 
 lazy_static! {
     static ref T_IF: Token = Keywd("if".into());
@@ -175,17 +176,18 @@ pub fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Expr>> {
     }
 }
 
-// TODO: when running multithreaded tests, this is bad. RUST_TEST_THREADS=1
-static mut P_EXPR_VALUE: Option<Rc<dyn Parser<TokenBuffer, Box<Expr>>>> = None;
+thread_local! {
+    static P_EXPR_VALUE: RefCell<Option<Rc<dyn Parser<TokenBuffer, Box<Expr>>>>> = RefCell::new(None);
+}
 
 pub fn init_p_expr() {
     unsafe {
-        if let Some(_) = P_EXPR_VALUE {
-            return;
-        } else {
-            let mp = make_expr_mixfix();
-            P_EXPR_VALUE = Some(mp.build_parser())
-        }
+        P_EXPR_VALUE.with(|mut p_expr| {
+            if let None = *p_expr.borrow() {
+                let mp = make_expr_mixfix();
+                p_expr.replace(Some(mp.build_parser()));
+            }
+        })
     }
 }
 
@@ -238,10 +240,19 @@ pub fn p_prim(input: TokenBuffer) -> DefnIResult {
 
 pub fn p_expr(input: TokenBuffer) -> ExprIResult {
     unsafe {
-        match &P_EXPR_VALUE {
-            Some(parser) => parser(input),
-            None => panic!(" !!!parser was not initialized!!! "),
-        }
+        P_EXPR_VALUE.with(move |p_expr_value| {
+
+            if let Some(parser) = (*p_expr_value.borrow()).map(|x| Rc::clone(&x)) {
+                parser(input)
+            } else {
+                panic!(" !!!parser was not initialized!!! ")
+            }
+
+            // match ((*p_expr_value).borrow()) {
+            //     Some(parser) => parser(input),
+            //     None => panic!(" !!!parser was not initialized!!! "),
+            // }
+        })
     }
 }
 
