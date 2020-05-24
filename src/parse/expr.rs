@@ -1,31 +1,29 @@
+use crate::annotate::*;
 use crate::data::Expr::{self, *};
 use crate::lex::{
-    self,
+    self, take_ident, ttag,
     Token::{self, *},
     TokenBuffer,
-    take_ident,
-    ttag,
 };
-use crate::annotate::*;
 use crate::mixfix::{
-    mixfix::*,
     combinator::{bin_op, un_op},
+    mixfix::*,
 };
 use crate::parse::types::*;
+use core::fmt::Error;
 use nom::{
     self,
     branch::alt,
     bytes::complete::take_until,
     character::complete::{alpha1, char, space0, space1},
     combinator::map,
-    combinator::{complete, not, peek, opt},
+    combinator::{complete, not, opt, peek},
     error::{ErrorKind, ParseError},
     multi::{fold_many0, many0, many1, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
     Err, IResult,
 };
-use core::fmt::Error;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -51,7 +49,8 @@ fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<A
 
     box Annotated {
         tok: expr,
-        idx, len,
+        idx,
+        len,
     }
 }
 
@@ -78,13 +77,9 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
     levels.insert(
         P_LET,
         Rc::new(Mixes {
-            prefix: Rc::new(
-                box anno_prefix_parser(
-                    alt((
-                        p_let, p_if, p_while, p_mutable, p_mutate
-                    ))
-                )
-            ),
+            prefix: Rc::new(box anno_prefix_parser(alt((
+                p_let, p_if, p_while, p_mutable, p_mutate,
+            )))),
             ..Mixes::default()
         }),
     );
@@ -174,13 +169,16 @@ pub fn init_p_expr() {
 }
 
 fn annotated(
-    parser: Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Expr>>
+    parser: Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Expr>>,
 ) -> Rc<Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>>>> {
     Rc::new(box move |input: TokenBuffer| {
         let idx = input.first().map(|x| x.idx);
         let last_idx_len = input.last().map(|x| x.idx + x.len);
         if idx.is_none() || last_idx_len.is_none() {
-            return Err(Err::Error(ParseError::from_error_kind(input, ErrorKind::Tag)))
+            return Err(Err::Error(ParseError::from_error_kind(
+                input,
+                ErrorKind::Tag,
+            )));
         }
         let idx = idx.unwrap();
         let len = last_idx_len.unwrap() - idx;
@@ -202,7 +200,7 @@ pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> 
     };
     // let len = input.first().map(|x| x.idx + x.len - idx).unwrap_or(len);
 
-    Ok((input, tok))//box Annotated { tok, idx, len }))
+    Ok((input, tok)) //box Annotated { tok, idx, len }))
 }
 
 fn p_terminals(input: TokenBuffer) -> ExprIResult {
@@ -275,9 +273,7 @@ pub fn p_while(input: TokenBuffer) -> UnOpIResult {
     let (input, _) = ttag(&T_WHILE)(input)?;
     let (input, pred) = p_expr(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    Ok((input, box move |body| {
-        WhileE(pred.clone(), body.clone())
-    }))
+    Ok((input, box move |body| WhileE(pred.clone(), body.clone())))
 }
 
 pub fn p_func(input: TokenBuffer) -> UnOpIResult {

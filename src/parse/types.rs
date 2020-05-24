@@ -1,8 +1,11 @@
-use crate::lex::{Token::{self, *}, TokenBuffer};
-use crate::data::*;
 use crate::annotate::Annotated;
+use crate::data::*;
+use crate::lex::{
+    Token::{self, *},
+    TokenBuffer,
+};
+use crate::mixfix::mixfix::{BinOp, UnOp};
 use nom::IResult;
-use crate::mixfix::mixfix::{UnOp, BinOp};
 
 lazy_static! {
     pub static ref T_IF: Token = Keywd("if".into());

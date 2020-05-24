@@ -1,3 +1,4 @@
+use crate::annotate::Annotated;
 use core::iter::Enumerate;
 use core::iter::Map;
 use core::slice::Iter;
@@ -22,7 +23,6 @@ use nom::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::annotate::Annotated;
 
 pub type TokenBuffer = Vec<Annotated<Token>>;
 

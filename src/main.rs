@@ -14,10 +14,10 @@ extern crate clap;
 
 mod data;
 // mod interp;
+mod annotate;
 mod lex;
 mod mixfix;
 mod parse;
-mod annotate;
 
 use clap::Clap;
 use data::*;
@@ -48,10 +48,19 @@ fn main() {
 
     // println!("{:?}", fully_parse_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y"));
     println!("{:#?}", fully_parse_expr("print -1; true"));
-    println!("{:#?}", fully_parse_expr("let foo = 1 in let bar = 2 in foo"));
+    println!(
+        "{:#?}",
+        fully_parse_expr("let foo = 1 in let bar = 2 in foo")
+    );
     println!("{:#?}", fully_parse_expr("fn x => y => print x"));
-    println!("{:#?}", fully_parse_expr("let foo = fn x => print x in foo 3"));
-    println!("{:#?}", fully_parse_expr("let foo = fn x => fn y => print x in foo 3 4"));
+    println!(
+        "{:#?}",
+        fully_parse_expr("let foo = fn x => print x in foo 3")
+    );
+    println!(
+        "{:#?}",
+        fully_parse_expr("let foo = fn x => fn y => print x in foo 3 4")
+    );
 }
 
 // fn interp_from_file(filename: &str) -> Option<Value> {
