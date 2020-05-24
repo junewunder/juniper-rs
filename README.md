@@ -18,3 +18,4 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - match/case analysis
  - error reporting on parsing
  - error reporting on interpreting
+ - top level constants

@@ -22,6 +22,7 @@ use nom::{
 };
 use std::cell::RefCell;
 use std::rc::Rc;
+use crate::annotate::Annotated;
 
 pub type TokenBuffer = Vec<Annotated<Token>>;
 
@@ -52,13 +53,6 @@ fn annotated(
             },
         ))
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Annotated<T> {
-    pub tok: T,
-    pub idx: usize,
-    pub len: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]

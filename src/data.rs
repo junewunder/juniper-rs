@@ -1,3 +1,4 @@
+use crate::annotate::Annotated;
 use im::hashmap::HashMap;
 use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display};
@@ -6,35 +7,39 @@ use std::rc::Rc;
 #[derive(PartialEq, Debug, Clone)]
 pub enum Expr {
     NumE(f64),
-    PlusE(Box<Expr>, Box<Expr>),
-    MinusE(Box<Expr>, Box<Expr>),
-    MultE(Box<Expr>, Box<Expr>),
-    DivE(Box<Expr>, Box<Expr>),
-    NegE(Box<Expr>),
+    PlusE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    MinusE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    MultE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    DivE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    NegE(Box<Annotated<Expr>>),
 
     BoolE(bool),
-    AndE(Box<Expr>, Box<Expr>),
-    OrE(Box<Expr>, Box<Expr>),
-    EqE(Box<Expr>, Box<Expr>),
-    LtE(Box<Expr>, Box<Expr>),
-    GtE(Box<Expr>, Box<Expr>),
-    IfE(Box<Expr>, Box<Expr>, Box<Expr>),
+    AndE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    OrE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    EqE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    LtE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    GtE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    IfE(
+        Box<Annotated<Expr>>,
+        Box<Annotated<Expr>>,
+        Box<Annotated<Expr>>,
+    ),
 
     StringE(String),
 
     VarE(String),
-    LetE(String, Box<Expr>, Box<Expr>),
+    LetE(String, Box<Annotated<Expr>>, Box<Annotated<Expr>>),
 
-    FnE(String, Box<Expr>),
-    AppE(Box<Expr>, Box<Expr>),
+    FnE(String, Box<Annotated<Expr>>),
+    AppE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
     AppPrimE(String, Vec<String>),
 
-    SeqE(Box<Expr>, Box<Expr>),
+    SeqE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
 
-    WhileE(Box<Expr>, Box<Expr>),
-    MutableE(String, Box<Expr>, Box<Expr>),
-    MutateE(Box<Expr>, Box<Expr>),
-    UnboxE(Box<Expr>),
+    WhileE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    MutableE(String, Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    MutateE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    DerefE(Box<Annotated<Expr>>),
 }
 // TODO:
 // ClassE(Vec<String>, Vec<(String, Expr)>),

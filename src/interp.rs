@@ -136,7 +136,7 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             }
             None
         }
-        UnboxE(e) => {
+        DerefE(e) => {
             let v = interp(e, env)?;
             match v {
                 MutV(cell) => Some(*cell.borrow().clone()),
