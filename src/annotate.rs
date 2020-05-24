@@ -12,13 +12,26 @@ pub struct Annotated<T> {
     pub tok: T,
     pub idx: usize,
     pub len: usize,
+    // TODO: add filename
 }
 
-impl<T> Deref for Annotated<T> {
-    type Target = T;
+impl<T> From<T> for Annotated<T> {
+    fn from(tok: T) -> Self {
+        Annotated::zero(tok)
+    }
+}
 
-    fn deref(&self) -> &Self::Target {
-        &self.tok
+impl<T> Annotated<T> {
+    pub fn zero(tok: T) -> Annotated<T> {
+        Annotated {
+            tok,
+            idx: 0,
+            len: 0,
+        }
+    }
+
+    pub fn unwrap(self) -> T {
+        self.tok
     }
 }
 

@@ -1,11 +1,37 @@
 use crate::data::*;
+use crate::annotate::Annotated;
 use im::HashMap;
 use std::cell::RefCell;
+use std::error;
+use std::fmt;
 use std::rc::Rc;
 
-type DefEnv = HashMap<String, (String, Box<Expr>)>;
+type DefEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
+type InterpResult = std::result::Result<Value, InterpError>;
 
-pub fn interp_program(defs: Vec<Defn>) -> Option<Value> {
+#[derive(Debug, Clone)]
+enum InterpError {
+    TypeError(Expr, usize, usize),
+}
+
+impl fmt::Display for InterpError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use InterpError::*;
+        match self {
+            TypeError(_expr, idx, len) => write!(f, "Type Error @ {}..{}", idx, len),
+            _ => write!(f, "error with expr @ ?..? (PRINT UNIMPLEMENTED)")
+        }
+    }
+}
+
+impl error::Error for InterpError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
+}
+
+pub fn interp_program(defs: Vec<Annotated<Defn>>) -> Option<Value> {
     let mut env_init: Env = vec![
         ("delay".into(), Value::PrimV("delay".into())),
         ("print".into(), Value::PrimV("print".into())),
@@ -32,9 +58,9 @@ pub fn interp_program(defs: Vec<Defn>) -> Option<Value> {
     panic!("no <main> method")
 }
 
-fn interp_fn_defs(denv: DefEnv, def: Defn) -> DefEnv {
+fn interp_fn_defs(denv: DefEnv, def: Annotated<Defn>) -> DefEnv {
     use Defn::*;
-    match def {
+    match def.unwrap() {
         FnD(name, x, expr) => denv.update(name, (x, expr)),
         PrimD(name, mut xs) => {
             let app = box Expr::AppPrimE(name.clone(), xs.clone());
@@ -43,7 +69,9 @@ fn interp_fn_defs(denv: DefEnv, def: Defn) -> DefEnv {
                 name,
                 (
                     arg0,
-                    xs.iter().fold(app, |acc, x| box Expr::FnE(x.into(), acc)),
+                    xs.iter().fold(
+                        box Annotated::zero(*app), // TODO: use actual locations here
+                        |acc, x| box Annotated::zero(Expr::FnE(x.into(), acc))),
                 ),
             )
         }
@@ -51,12 +79,16 @@ fn interp_fn_defs(denv: DefEnv, def: Defn) -> DefEnv {
     }
 }
 
-pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
+pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> Option<Value> {
     use Expr::*;
     use Value::*;
     let interp = interp_expr;
+
+    let err_idx = e.idx;
+    let err_len = e.len;
+    let e = e.unwrap();
     // println!("{:?}", e);
-    match *e {
+    match e {
         NumE(i) => Some(NumV(i)),
         PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Some(NumV(i1 + i2)),
@@ -123,16 +155,9 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             interp(body, &next_env)
         }
         MutateE(xe, e) => {
-            // println!("HELLOOOOOO");
-            // println!("interp {:?}", e);
             let v = interp(e, env)?;
-            // println!("next value: {:?}", v);
-            // println!("xe: {:?} = {:?}", xe, interp(xe.clone(), env)?);
             if let MutV(x) = interp(xe, env)? {
-                // println!("x: {:?}", x);
                 x.replace(Box::new(v));
-                // println!("x: {:?}", x);
-                // println!("env: {:?}", env.get("i".into()));
             }
             None
         }
@@ -158,13 +183,12 @@ pub fn interp_expr(e: Box<Expr>, env: &Env) -> Option<Value> {
             interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
         }
         WhileE(pred, body) => {
-            let continue_loop = |pred: Box<Expr>, env: &Env| match interp_expr(pred, env) {
+            let continue_loop = |pred: Box<Annotated<Expr>>, env: &Env| match interp_expr(pred, env) {
                 Some(Value::BoolV(b)) => b,
                 _ => false,
             };
 
-            // TODO: This seems a little extreme to CLONE the pred and body every time
-            // use Rc for exprs???
+            // TODO: This seems a little extreme to CLONE the pred and body every time use Rc for exprs???
             while continue_loop(pred.clone(), env) {
                 interp_expr(body.clone(), env);
             }
@@ -181,7 +205,7 @@ fn interp_prim(name: String, values: Vec<Value>) -> Option<Value> {
             if let Some(v) = values.get(0) {
                 println!("{}", v);
             } else {
-                println!("{:?}", None as Option<u32>);
+                println!("None");
             }
             Some(PrimV("print".into()))
         }

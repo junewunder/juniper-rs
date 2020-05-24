@@ -13,7 +13,7 @@ extern crate lazy_static;
 extern crate clap;
 
 mod data;
-// mod interp;
+mod interp;
 mod annotate;
 mod lex;
 mod mixfix;
@@ -30,15 +30,15 @@ fn main() {
     //     .into_iter()
     //     .collect();
 
-    let (r, tokbuf) = lex::lex("if true then 1 else 2").expect("expr failed lexing");
+    // let (r, tokbuf) = lex::lex("if true then 1 else 2").expect("expr failed lexing");
     //
     // // println!("remain: {:?}", r);
     // // println!("tokbuf: {:?}", tokbuf);
 
-    // println!(
-    //     "{}",
-    //     interp_from_file("./examples/loop.juni").unwrap_or(Value::StringV("null".into()))
-    // );
+    println!(
+        "{}",
+        interp_from_file("./examples/loop.juni").unwrap_or(Value::StringV("ERR".into()))
+    );
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));
     // println!("{:?}", fully_interp_expr("print -1; true", &env));
     // println!("{:?}", fully_interp_expr("let foo = 1 in let bar = 2 in foo", &env));
@@ -47,35 +47,35 @@ fn main() {
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => print x in foo 3 4", &env));
 
     // println!("{:?}", fully_parse_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y"));
-    println!("{:#?}", fully_parse_expr("print -1; true"));
-    println!(
-        "{:#?}",
-        fully_parse_expr("let foo = 1 in let bar = 2 in foo")
-    );
-    println!("{:#?}", fully_parse_expr("fn x => y => print x"));
-    println!(
-        "{:#?}",
-        fully_parse_expr("let foo = fn x => print x in foo 3")
-    );
-    println!(
-        "{:#?}",
-        fully_parse_expr("let foo = fn x => fn y => print x in foo 3 4")
-    );
+    // println!("{:#?}", fully_parse_expr("print -1; true"));
+    // println!(
+    //     "{:#?}",
+    //     fully_parse_expr("let foo = 1 in let bar = 2 in foo")
+    // );
+    // println!("{:#?}", fully_parse_expr("fn x => y => print x"));
+    // println!(
+    //     "{:#?}",
+    //     fully_parse_expr("let foo = fn x => print x in foo 3")
+    // );
+    // println!(
+    //     "{:#?}",
+    //     fully_parse_expr("let foo = fn x => fn y => print x in foo 3 4")
+    // );
 }
 
-// fn interp_from_file(filename: &str) -> Option<Value> {
-//     let input = fs::read_to_string(filename).expect("Unable to read file");
-//     let input = input.as_ref();
-//     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
-//     let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
-//     interp::interp_program(ast)
-// }
+fn interp_from_file(filename: &str) -> Option<Value> {
+    let input = fs::read_to_string(filename).expect("Unable to read file");
+    let input = input.as_ref();
+    let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
+    let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
+    interp::interp_program(ast)
+}
 
-// fn fully_interp_expr(input: &str, env: &Env) -> Option<Value> {
-//     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
-//     let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
-//     interp::interp_expr(ast, env)
-// }
+fn fully_interp_expr(input: &str, env: &Env) -> Option<Value> {
+    let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
+    let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
+    interp::interp_expr(ast, env)
+}
 
 fn fully_parse_expr(input: &str) -> Box<annotate::Annotated<Expr>> {
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");

@@ -149,7 +149,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
     );
 
     MixfixParser {
-        terminals: annotated(box p_terminals),
+        terminals: annotated_terminal(box p_terminals),
         levels,
     }
 }
@@ -168,7 +168,7 @@ pub fn init_p_expr() {
     }
 }
 
-fn annotated(
+fn annotated_terminal(
     parser: Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Expr>>,
 ) -> Rc<Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>>>> {
     Rc::new(box move |input: TokenBuffer| {
@@ -190,17 +190,12 @@ fn annotated(
 }
 
 pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> {
-    // let idx = input.first().unwrap().idx;
-    // let len = input.last().map(|x| x.idx + x.len).unwrap() - idx;
-    let (input, tok) = unsafe {
+    unsafe {
         match &P_EXPR_VALUE {
-            Some(parser) => parser(input)?,
+            Some(parser) => parser(input),
             None => panic!(" !!!parser was not initialized!!! "),
         }
-    };
-    // let len = input.first().map(|x| x.idx + x.len - idx).unwrap_or(len);
-
-    Ok((input, tok)) //box Annotated { tok, idx, len }))
+    }
 }
 
 fn p_terminals(input: TokenBuffer) -> ExprIResult {
@@ -222,7 +217,7 @@ fn p_parens(input: TokenBuffer) -> ExprIResult {
     let (input, _) = ttag(&T_OP_PAREN)(input)?;
     let (input, e) = p_expr(input)?;
     let (input, _) = ttag(&T_CL_PAREN)(input)?;
-    Ok((input, (**e).clone()))
+    Ok((input, (*e).unwrap()))
 }
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
@@ -308,11 +303,6 @@ macro_rules! binop {
         }
     };
 }
-
-// pub fn p_seq(input: TokenBuffer) -> BinOpIResult {
-//     let (input, _) = ttag(&T_SEMICOLON)(input)?;
-//     Ok((input, box |lhs, rhs| SeqE(lhs, rhs)))
-// }
 
 binop!(p_seq, T_SEMICOLON, SeqE);
 binop!(p_add, T_ADD, PlusE);

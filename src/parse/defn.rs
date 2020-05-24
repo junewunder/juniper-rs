@@ -1,4 +1,4 @@
-use crate::data::Defn;
+use crate::data::{Expr, Defn};
 use crate::lex::{
     self,
     Token::{self, *},
@@ -27,7 +27,7 @@ use nom::{
 use core::fmt::Error;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::parse::tok::*;
+use crate::parse::types::*;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Annotated<Defn>>> {
     let (input, defs) = many0(alt((
@@ -62,7 +62,11 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
             tok: Defn::FnD(
                 name,
                 x_top,
-                xs.into_iter().fold(body, |acc, x| box FnE(x.clone(), acc)),
+                xs.into_iter().fold(body, |acc, x| box Annotated{
+                    tok: Expr::FnE(x.clone(), acc),
+                    idx: 0,
+                    len: 0,
+                }),
             ),
             idx: 0,
             len: 0,

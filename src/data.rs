@@ -48,7 +48,7 @@ pub enum Expr {
 
 #[derive(Debug)]
 pub enum Defn {
-    FnD(String, String, Box<Expr>),
+    FnD(String, String, Box<Annotated<Expr>>),
     PrimD(String, Vec<String>),
 }
 
@@ -59,7 +59,7 @@ pub enum Value {
     StringV(String),
     MutV(Rc<RefCell<Box<Value>>>),
     PrimV(String),
-    CloV(Option<String>, String, Box<Expr>, Rc<Env>),
+    CloV(Option<String>, String, Box<Annotated<Expr>>, Rc<Env>),
     Null,
 }
 // | ClassV [String] [(String, Expr)] Env
