@@ -1,0 +1,5 @@
+fn main :: x =>
+  let hello = 1 in (
+    florp + 1;
+    hello
+  )

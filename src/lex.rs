@@ -1,3 +1,4 @@
+use crate::annotate::Annotated;
 use core::iter::Enumerate;
 use core::iter::Map;
 use core::slice::Iter;
@@ -7,8 +8,8 @@ use nom::character::complete::newline;
 use nom::character::complete::space0;
 use nom::combinator::map;
 use nom::combinator::not;
-use nom::combinator::value;
 use nom::combinator::opt;
+use nom::combinator::value;
 use nom::error::{ErrorKind, ParseError};
 use nom::number::complete::double;
 use nom::Err;
@@ -20,8 +21,39 @@ use nom::{
     multi::{fold_many0, many0},
     whitespace, IResult,
 };
+use std::cell::RefCell;
+use std::rc::Rc;
 
-pub type TokenBuffer = Vec<Token>;
+pub type TokenBuffer = Vec<Annotated<Token>>;
+
+struct AnnotationState {
+    curr_pos: usize,
+}
+
+fn annotated(
+    state: Rc<RefCell<AnnotationState>>,
+    parser: Box<dyn Fn(&str) -> IResult<&str, Token>>,
+) -> impl Fn(&str) -> IResult<&str, Annotated<Token>> {
+    move |input: &str| {
+        let state = state.clone();
+        let prev_pos = state.borrow().curr_pos;
+        let prev_len = input.len();
+        let (input, result) = parser(input)?;
+
+        let mut state = state.borrow_mut();
+        let difference = prev_len - input.len();
+        state.curr_pos = prev_pos + difference;
+
+        Ok((
+            input,
+            Annotated {
+                tok: result,
+                idx: prev_pos,
+                len: difference,
+            },
+        ))
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
@@ -37,18 +69,24 @@ pub enum Token {
 }
 
 pub fn lex(input: &str) -> IResult<&str, TokenBuffer> {
-    let (input, tokbuf) = many0(alt((
-        map(p_comment, |_| Token::Comment),
-        p_string,
-        p_reserved,
-        p_ident,
-        map(is_a(" \t\n\r"), |x| Token::Space),
-        map(double, |i| Token::Num(i)),
-    )))(input)?;
+    let state = Rc::new(RefCell::new(AnnotationState { curr_pos: 0 }));
+
+    let tokalt: Box<dyn Fn(&str) -> IResult<&str, Token>> = box |i: &str| {
+        alt((
+            map(p_comment, |_| Token::Comment),
+            p_string,
+            p_reserved,
+            p_ident,
+            map(is_a(" \t\n\r"), |x| Token::Space),
+            map(double, |i| Token::Num(i)),
+        ))(i)
+    };
+
+    let (input, tokbuf) = many0(annotated(state, tokalt))(input)?;
 
     let tokbuf = tokbuf
         .into_iter()
-        .filter(|x| *x != Token::Comment && *x != Token::Space)
+        .filter(|x| (*x).tok != Token::Comment && (*x).tok != Token::Space)
         .collect();
 
     Ok((input, tokbuf))
@@ -114,7 +152,8 @@ fn test_string() {
 
 pub fn p_string(input: &str) -> IResult<&str, Token> {
     let (input, _) = tag("\"")(input)?;
-    let (input, contents) = opt(escaped_transform( // TODO: why is this NOT working
+    let (input, contents) = opt(escaped_transform(
+        // TODO: why is this NOT working
         is_not("\r\n\""),
         '\\',
         |i: &str| {
@@ -127,7 +166,7 @@ pub fn p_string(input: &str) -> IResult<&str, Token> {
             ))(i);
             println!("RESULT {:?}", r);
             r
-        }
+        },
     ))(input)?;
     let (input, _) = tag("\"")(input)?;
 
@@ -148,7 +187,7 @@ pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
         return Err(Err::Error(ParseError::from_error_kind(input, e)));
     };
 
-    if let Token::Ident(ident) = t.remove(0) {
+    if let Token::Ident(ident) = t.remove(0).tok {
         return Ok((t, ident.clone()));
     };
 
@@ -166,7 +205,7 @@ pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Token> 
             return Err(Err::Error(ParseError::from_error_kind(input, e)));
         };
 
-        if input.remove(0) == tag {
+        if input.remove(0).tok == tag {
             return Ok((input, tag.clone()));
         };
 

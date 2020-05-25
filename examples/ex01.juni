@@ -4,7 +4,7 @@ fn lolyay :: x =>
   print 1 x 1 x 1 x 1
 
 fn main :: x =>
-  let foo = fn x => y => x + y in
+  let foo = fn x => fn y => x + y in
   let x = 69 in
   let y = 420 in
   print (foo x y);

@@ -60,6 +60,7 @@ where
     pub infix_r: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
 }
 
+// TODO: make this a macro
 impl<I, O> Mixes<I, O>
 where
     I: Clone + 'static,

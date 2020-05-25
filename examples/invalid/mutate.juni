@@ -1,0 +1,5 @@
+fn main :: x =>
+  mut i = 1 in (
+    !i = *1 + 1;
+    i
+  )
