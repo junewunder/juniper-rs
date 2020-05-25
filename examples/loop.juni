@@ -6,7 +6,7 @@ fn main :: arg =>
   mut numbers = "1..10 = " in (
     while (*i) < 10 => (
       print "looping";
-      !i = (*i) + 1;
+      !i = (*RLGJKHB) + 1;
       !numbers = *numbers + (if *i > 1 then ", " else "") + *i;
       print ("i = " + i);
       delay 100

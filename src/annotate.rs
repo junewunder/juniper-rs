@@ -6,8 +6,9 @@ use nom::{
     Err,
 };
 use std::ops::Deref;
+use std::fmt;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct Annotated<T> {
     pub tok: T,
     pub idx: usize,
@@ -31,6 +32,19 @@ impl<T> Annotated<T> {
 
     pub fn unwrap(self) -> T {
         self.tok
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for Annotated<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.tok)
+        // write!(f, "{:?}@<{}:{}>", self.tok, self.idx, self.len)
+    }
+}
+
+impl<T: fmt::Display> fmt::Display for Annotated<T> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.tok)
     }
 }
 

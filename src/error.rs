@@ -1,3 +1,4 @@
+use crate::data::Value;
 use std::error;
 use std::fmt::{self, Formatter};
 use std::fs;
@@ -16,30 +17,38 @@ pub struct InterpError {
 pub enum InterpErrorKind {
     TypeError,
     UndefinedError(String),
+    DerefError(Value)
 }
 
 impl fmt::Display for InterpError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         use InterpErrorKind::*;
 
-        match self.kind.clone() {
+        let err_msg: String = match self.kind.clone() {
             TypeError => {
-                write!(f, "Type Error at line {}\n\t", calc_line(&self))
+                format!("Type Error")
             },
             UndefinedError(name) => {
-                write!(f, "Undefined variable \"{}\" at line {}\n\t", name, calc_line(&self))
+                format!("Undefined variable \"{}\"", name)
             },
-            _ => {
-                write!(f, "error with expr at line {} (ERROR PRINTING UNIMPLEMENTED)\n\t", calc_line(&self))
+            DerefError(value) => {
+                format!("Value cannot be dereferenced \"{}\"", value)
+            },
+            x => {
+                format!("some error {:?}", x)
             }
         };
 
         match self.loc.clone() {
-            Some(loc) => write!(f, "{}", display_from_file(loc, self.idx, self.len)),
-            None => write!(f, "<file location unknown>"),
-        };
-
-        write!(f, "")
+            Some(loc) => {
+                let contents = fs::read_to_string(loc.as_str()).expect(&format!("Unable to read file \"{}\"", loc));
+                let snippet = display_from_file(&contents, self.idx, self.len);
+                write!(f, "{} at line {}\n\t{}", err_msg, calc_line(&self, &contents), snippet)
+            },
+            None => {
+                write!(f, "{} in <unknown file>", err_msg)
+            },
+        }
     }
 }
 
@@ -51,8 +60,7 @@ impl error::Error for InterpError {
 }
 
 // TODO: make this take String file contents and usize idx
-fn calc_line(err: &InterpError) -> usize {
-    let contents = fs::read_to_string(err.loc.clone().unwrap().as_str()).expect("Unable to read file");
+fn calc_line(err: &InterpError, contents: &String) -> usize {
     let idx_out_of_bounds = format!("Error position out of bounds for file: {:?}", err.loc);
     let lines: Vec<&str> = contents.split('\n').collect();
     let mut curr_pos = 0;
@@ -64,8 +72,7 @@ fn calc_line(err: &InterpError) -> usize {
     line_num
 }
 
-fn display_from_file(filename: String, idx: usize, len: usize) -> String {
-    let contents = fs::read_to_string(filename.as_str()).expect("Unable to read file");
+fn display_from_file(contents: &String, idx: usize, len: usize) -> String {
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
     String::from_utf8(contents.to_owned()).expect("Unable to read file to UTF8 format")

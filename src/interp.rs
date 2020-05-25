@@ -67,7 +67,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
     let e = e.unwrap();
 
     macro_rules! err {
-        ($variant:ident) => {
+        ($variant:expr) => {
             Err(InterpError {
                 kind: $variant,
                 idx: err_idx,
@@ -77,7 +77,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         };
     }
 
-    // println!("{:?}", e);
+    println!("{:?}", e);
     match e {
         NumE(i) => Ok(NumV(i)),
         PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
@@ -161,13 +161,15 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         }
         DerefE(e) => {
             let v = interp(e, env)?;
+            println!("{:?}", v);
             match v {
                 MutV(cell) => Ok(*cell.borrow().clone()),
-                _ => Ok(v),
+                _ => err!(DerefError(v)),
             }
         }
-        SeqE(e1, e2) => match (interp(e1, env), interp(e2, env)) {
-            (_, v2) => v2,
+        SeqE(e1, e2) => {
+            interp(e1, env)?;
+            interp(e2, env)
         },
         FnE(x, body) => Ok(CloV(None, x, body, Rc::new(env.clone()))),
         AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
@@ -181,14 +183,14 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
         }
         WhileE(pred, body) => {
-            let continue_loop = |pred: Box<Annotated<Expr>>, env: &Env| match interp(pred, env) {
-                Ok(Value::BoolV(b)) => b,
-                _ => false,
-            };
-
             // TODO: This seems a little extreme to CLONE the pred and body every time use Rc for exprs???
-            while continue_loop(pred.clone(), env) {
-                interp(body.clone(), env);
+            loop {
+                match interp(pred.clone(), env)? {
+                    BoolV(true) => (),
+                    BoolV(false) => break,
+                    _ => return err!(TypeError),
+                };
+                interp(body.clone(), env)?;
             }
             Ok(Value::Null)
         }

@@ -184,7 +184,7 @@ fn annotated_terminal(
         let len = last_idx_len.unwrap() - idx;
 
         let (input, tok) = parser(input)?;
-        let len = input.first().map(|x| x.idx + x.len - idx).unwrap_or(len);
+        let len = input.first().map(|x| x.idx - idx).unwrap_or(len);
         Ok((input, box Annotated { tok, idx, len }))
     })
 }
