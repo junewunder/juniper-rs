@@ -19,3 +19,4 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - error reporting on parsing
  - error reporting on interpreting
  - top level constants
+ - REPL functionality

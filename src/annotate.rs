@@ -12,7 +12,6 @@ pub struct Annotated<T> {
     pub tok: T,
     pub idx: usize,
     pub len: usize,
-    // TODO: add filename
 }
 
 impl<T> From<T> for Annotated<T> {

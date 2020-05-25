@@ -18,6 +18,7 @@ mod annotate;
 mod lex;
 mod mixfix;
 mod parse;
+mod error;
 
 use clap::Clap;
 use data::*;
@@ -26,19 +27,14 @@ use std::fs;
 fn main() {
     parse::init_p_expr();
 
-    // let env: Env = vec![("print".into(), Value::PrimV("print".into()))]
-    //     .into_iter()
-    //     .collect();
+    let filename = "./examples/invalid/02-type-error.juni";
+    interp_from_file(filename)
+        .map(|v| println!("{}", v))
+        .map_err(|mut e| {
+            e.loc = Some(filename.into());
+            println!("{}", e)
+        });
 
-    // let (r, tokbuf) = lex::lex("if true then 1 else 2").expect("expr failed lexing");
-    //
-    // // println!("remain: {:?}", r);
-    // // println!("tokbuf: {:?}", tokbuf);
-
-    println!(
-        "{}",
-        interp_from_file("./examples/loop.juni").unwrap_or(Value::StringV("ERR".into()))
-    );
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));
     // println!("{:?}", fully_interp_expr("print -1; true", &env));
     // println!("{:?}", fully_interp_expr("let foo = 1 in let bar = 2 in foo", &env));
@@ -63,15 +59,16 @@ fn main() {
     // );
 }
 
-fn interp_from_file(filename: &str) -> Option<Value> {
+fn interp_from_file(filename: &str) -> interp::InterpResult {
     let input = fs::read_to_string(filename).expect("Unable to read file");
     let input = input.as_ref();
+    let filename = String::from(filename);
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
     interp::interp_program(ast)
 }
 
-fn fully_interp_expr(input: &str, env: &Env) -> Option<Value> {
+fn fully_interp_expr(input: &str, env: &Env) -> interp::InterpResult {
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
     interp::interp_expr(ast, env)
