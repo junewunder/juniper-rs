@@ -24,14 +24,20 @@ use clap::Clap;
 use data::*;
 use std::fs;
 
-fn main() {
-    parse::init_p_expr();
+#[derive(Clap, Debug)]
+struct Opts {
+    /// target file to run
+    #[clap(default_value="./examples/fibonacci.juni")]
+    target: String
+}
 
-    let filename = "./examples/invalid/02-type-error.juni";
-    interp_from_file(filename)
+fn main() {
+    let opts: Opts = Opts::parse();
+
+    interp_from_file(opts.target.as_str())
         .map(|v| println!("{}", v))
         .map_err(|mut e| {
-            e.loc = Some(filename.into());
+            e.loc = Some(opts.target);
             println!("{}", e)
         });
 

@@ -191,9 +191,13 @@ fn annotated_terminal(
 
 pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> {
     unsafe {
+        if P_EXPR_VALUE.is_none() {
+            init_p_expr();
+        }
+
         match &P_EXPR_VALUE {
             Some(parser) => parser(input),
-            None => panic!(" !!!parser was not initialized!!! "),
+            None => panic!(" !!!parser could not be initialized!!! "),
         }
     }
 }

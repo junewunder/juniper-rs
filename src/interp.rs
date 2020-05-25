@@ -136,7 +136,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             env.get(&x)
                 .cloned()
                 .ok_or_else(|| InterpError {
-                    kind: UndefinedError,
+                    kind: UndefinedError(x),
                     idx: err_idx,
                     len: err_len,
                     loc: None,
