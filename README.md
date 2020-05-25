@@ -11,12 +11,12 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - mutability
  - while loops
  - primitives
+ - error reporting on interpreting
 
 ## features to do:
 
  - arrays/objects/structs
  - match/case analysis
  - error reporting on parsing
- - error reporting on interpreting
  - top level constants
  - REPL functionality
