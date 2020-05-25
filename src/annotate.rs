@@ -5,8 +5,8 @@ use nom::{
     error::{ErrorKind, ParseError},
     Err,
 };
-use std::ops::Deref;
 use std::fmt;
+use std::ops::Deref;
 
 #[derive(Clone, PartialEq)]
 pub struct Annotated<T> {

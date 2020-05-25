@@ -12,13 +12,13 @@ extern crate lazy_static;
 #[macro_use]
 extern crate clap;
 
-mod data;
-mod interp;
 mod annotate;
+mod data;
+mod error;
+mod interp;
 mod lex;
 mod mixfix;
 mod parse;
-mod error;
 
 use clap::Clap;
 use data::*;
@@ -27,8 +27,8 @@ use std::fs;
 #[derive(Clap, Debug)]
 struct Opts {
     /// target file to run
-    #[clap(default_value="./examples/fibonacci.juni")]
-    target: String
+    #[clap(default_value = "./examples/fibonacci.juni")]
+    target: String,
 }
 
 fn main() {

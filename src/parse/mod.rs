@@ -1,7 +1,7 @@
-pub mod expr;
 pub mod defn;
+pub mod expr;
 pub mod types;
 
-pub use expr::*;
 pub use defn::*;
+pub use expr::*;
 pub use types::*;

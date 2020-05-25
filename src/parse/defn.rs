@@ -1,16 +1,13 @@
-use crate::data::{Expr, Defn};
+use crate::annotate::Annotated;
+use crate::data::{Defn, Expr};
 use crate::lex::{
-    self,
+    self, take_ident, ttag,
     Token::{self, *},
     TokenBuffer,
-    take_ident,
-    ttag,
 };
-use crate::annotate::Annotated;
-use crate::parse::{
-    expr::p_expr,
-    types::*,
-};
+use crate::parse::types::*;
+use crate::parse::{expr::p_expr, types::*};
+use core::fmt::Error;
 use nom::{
     self,
     branch::alt,
@@ -24,15 +21,11 @@ use nom::{
     sequence::pair,
     Err, IResult,
 };
-use core::fmt::Error;
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::parse::types::*;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Annotated<Defn>>> {
-    let (input, defs) = many0(alt((
-        p_fn_named, p_prim,
-    )))(input)?;
+    let (input, defs) = many0(alt((p_fn_named, p_prim)))(input)?;
 
     Ok((
         input,
@@ -62,7 +55,7 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
             tok: Defn::FnD(
                 name,
                 x_top,
-                xs.into_iter().fold(body, |acc, x| box Annotated{
+                xs.into_iter().fold(body, |acc, x| box Annotated {
                     tok: Expr::FnE(x.clone(), acc),
                     idx: 0,
                     len: 0,
@@ -70,7 +63,7 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
             ),
             idx: 0,
             len: 0,
-        }
+        },
     ))
 }
 
@@ -80,9 +73,12 @@ pub fn p_prim(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, xs) = separated_nonempty_list(ttag(&T_COMMA), take_ident)(input)?;
 
-    Ok((input, Annotated {
-        tok: Defn::PrimD(name, xs),
-        idx:0,
-        len:0,
-    }))
+    Ok((
+        input,
+        Annotated {
+            tok: Defn::PrimD(name, xs),
+            idx: 0,
+            len: 0,
+        },
+    ))
 }

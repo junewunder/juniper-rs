@@ -17,7 +17,7 @@ pub struct InterpError {
 pub enum InterpErrorKind {
     TypeError,
     UndefinedError(String),
-    DerefError(Value)
+    DerefError(Value),
 }
 
 impl fmt::Display for InterpError {
@@ -25,29 +25,26 @@ impl fmt::Display for InterpError {
         use InterpErrorKind::*;
 
         let err_msg: String = match self.kind.clone() {
-            TypeError => {
-                format!("Type Error")
-            },
-            UndefinedError(name) => {
-                format!("Undefined variable \"{}\"", name)
-            },
-            DerefError(value) => {
-                format!("Value cannot be dereferenced \"{}\"", value)
-            },
-            x => {
-                format!("some error {:?}", x)
-            }
+            TypeError => format!("Type Error"),
+            UndefinedError(name) => format!("Undefined variable \"{}\"", name),
+            DerefError(value) => format!("Value cannot be dereferenced \"{}\"", value),
+            x => format!("some error {:?}", x),
         };
 
         match self.loc.clone() {
             Some(loc) => {
-                let contents = fs::read_to_string(loc.as_str()).expect(&format!("Unable to read file \"{}\"", loc));
+                let contents = fs::read_to_string(loc.as_str())
+                    .expect(&format!("Unable to read file \"{}\"", loc));
                 let snippet = display_from_file(&contents, self.idx, self.len);
-                write!(f, "{} at line {}\n\t{}", err_msg, calc_line(&self, &contents), snippet)
-            },
-            None => {
-                write!(f, "{} in <unknown file>", err_msg)
-            },
+                write!(
+                    f,
+                    "{} at line {}\n\t{}",
+                    err_msg,
+                    calc_line(&self, &contents),
+                    snippet
+                )
+            }
+            None => write!(f, "{} in <unknown file>", err_msg),
         }
     }
 }
@@ -67,7 +64,10 @@ fn calc_line(err: &InterpError, contents: &String) -> usize {
     let mut line_num = 0;
     while curr_pos < err.idx {
         line_num += 1;
-        curr_pos += lines.get(line_num - 1).expect(idx_out_of_bounds.as_ref()).len();
+        curr_pos += lines
+            .get(line_num - 1)
+            .expect(idx_out_of_bounds.as_ref())
+            .len();
     }
     line_num
 }

@@ -1,5 +1,5 @@
-use crate::data::*;
 use crate::annotate::Annotated;
+use crate::data::*;
 use crate::error::*;
 use im::HashMap;
 use std::cell::RefCell;
@@ -48,7 +48,8 @@ fn interp_fn_defs(denv: DefEnv, def: Annotated<Defn>) -> DefEnv {
                     arg0,
                     xs.iter().fold(
                         box Annotated::zero(*app), // TODO: use actual locations here
-                        |acc, x| box Annotated::zero(Expr::FnE(x.into(), acc))),
+                        |acc, x| box Annotated::zero(Expr::FnE(x.into(), acc)),
+                    ),
                 ),
             )
         }
@@ -58,8 +59,8 @@ fn interp_fn_defs(denv: DefEnv, def: Annotated<Defn>) -> DefEnv {
 
 pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
     use Expr::*;
-    use Value::*;
     use InterpErrorKind::*;
+    use Value::*;
     let interp = interp_expr;
 
     let err_idx = e.idx;
@@ -77,7 +78,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         };
     }
 
-    println!("{:?}", e);
+    // println!("{:?}", e);
     match e {
         NumE(i) => Ok(NumV(i)),
         PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
@@ -132,15 +133,12 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             _ => err!(TypeError),
         },
         StringE(s) => Ok(Value::StringV(s)),
-        VarE(x) =>
-            env.get(&x)
-                .cloned()
-                .ok_or_else(|| InterpError {
-                    kind: UndefinedError(x),
-                    idx: err_idx,
-                    len: err_len,
-                    loc: None,
-                }),
+        VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
+            kind: UndefinedError(x),
+            idx: err_idx,
+            len: err_len,
+            loc: None,
+        }),
         LetE(x, e, body) => {
             let v = interp(e, env)?;
             let next_env = env.update(x, v);
@@ -161,7 +159,6 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         }
         DerefE(e) => {
             let v = interp(e, env)?;
-            println!("{:?}", v);
             match v {
                 MutV(cell) => Ok(*cell.borrow().clone()),
                 _ => err!(DerefError(v)),
@@ -170,7 +167,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         SeqE(e1, e2) => {
             interp(e1, env)?;
             interp(e2, env)
-        },
+        }
         FnE(x, body) => Ok(CloV(None, x, body, Rc::new(env.clone()))),
         AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
             (CloV(_, arg, body, mut local_env), arg_v) => {
@@ -199,8 +196,8 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
 }
 
 fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
-    use Value::*;
     use InterpErrorKind::*;
+    use Value::*;
     match name.as_str() {
         "print" => {
             if let Some(v) = values.first() {
