@@ -56,7 +56,6 @@ impl error::Error for InterpError {
     }
 }
 
-// TODO: make this take String file contents and usize idx
 fn calc_line(err: &InterpError, contents: &String) -> usize {
     let idx_out_of_bounds = format!("Error position out of bounds for file: {:?}", err.loc);
     let lines: Vec<&str> = contents.split('\n').collect();

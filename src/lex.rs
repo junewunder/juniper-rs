@@ -18,7 +18,7 @@ use nom::{
     branch::alt,
     bytes::complete::{escaped_transform, is_not, tag, take_till, take_until},
     character::complete::space1,
-    multi::{fold_many0, many0},
+    multi::{fold_many0, many0, many1},
     whitespace, IResult,
 };
 use std::cell::RefCell;
@@ -175,8 +175,8 @@ pub fn p_string(input: &str) -> IResult<&str, Token> {
 
 pub fn p_ident(input: &str) -> IResult<&str, Token> {
     let (input, _) = not(p_reserved)(input)?;
-    let (input, x) = alt((alpha1, is_a("_")))(input)?;
-    Ok((input, Token::Ident(x.to_string())))
+    let (input, x) = many1(alt((alpha1, is_a("_"))))(input)?;
+    Ok((input, Token::Ident(x.join("").to_string())))
 }
 
 pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
