@@ -44,10 +44,11 @@ fn main() {
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));
     // println!("{:?}", fully_interp_expr("print -1; true", &env));
     // println!("{:?}", fully_interp_expr("let foo = 1 in let bar = 2 in foo", &env));
-    // println!("{:?}", fully_interp_expr("fn x => y => print x", &env));
+    // println!("{:?}", fully_interp_expr("fn a :: x => y => print x", &env));
     // println!("{:?}", fully_interp_expr("let foo = fn x => print x in foo 3", &env));
     // println!("{:?}", fully_interp_expr("let foo = fn x => y => print x in foo 3 4", &env));
 
+    // println!("{:?}", fully_parse_expr("x => y => x + y + 1"));
     // println!("{:?}", fully_parse_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y"));
     // println!("{:#?}", fully_parse_expr("print -1; true"));
     // println!(

@@ -4,7 +4,6 @@ This is a toy programming language that I plan on using to add fun features to a
 
 An interesting part of this repository is a mixfix parser (located in `src/mixfix/mixfix.rs`). [The algorithm was copied from here.](https://github.com/uvm-plaid/uvmhs/blob/master/src/UVMHS/Lib/Parser/Mixfix.hs)
 
-
 ## features so far:
 
  - bools, numbers, strings
@@ -20,3 +19,5 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - error reporting on parsing
  - top level constants
  - REPL functionality
+ - custom parser error type
+ - parse values from command line to main function

@@ -56,7 +56,7 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
                 name,
                 x_top,
                 xs.into_iter().fold(body, |acc, x| box Annotated {
-                    tok: Expr::FnE(x.clone(), acc),
+                    tok: Expr::FnE(None, x.clone(), acc),
                     idx: 0,
                     len: 0,
                 }),

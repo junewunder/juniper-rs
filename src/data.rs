@@ -30,7 +30,7 @@ pub enum Expr {
     VarE(String),
     LetE(String, Box<Annotated<Expr>>, Box<Annotated<Expr>>),
 
-    FnE(String, Box<Annotated<Expr>>),
+    FnE(Option<String>, String, Box<Annotated<Expr>>),
     AppE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
     AppPrimE(String, Vec<String>),
 
@@ -76,12 +76,26 @@ impl Display for Value {
             MutV(m) => write!(f, "mut {}", *m.borrow()),
             PrimV(p) => write!(f, "<prim {}>", p),
             CloV(name, arg, expr, env) => {
-                let name = name.clone().unwrap_or("anon".to_string());
-                write!(f, "<fn {}>", name)
+                let name = name.clone().unwrap_or("{anon}".to_string());
+                write!(f, "<fn {} :: {} {}>", name, arg, print_env_safe(env))
             }
             Null => write!(f, "null"),
         }
     }
+}
+
+pub fn print_env_safe(env: &Rc<Env>) -> String {
+    let mut env_str = format!("{{ ");
+    for (k, v) in env.iter() {
+        match v {
+            Value::CloV(_, arg, _, _) => {
+                env_str = format!("{}{}: <fn {}>, ", env_str, k, arg)
+            },
+            _ => env_str = format!("{}: {}, ", k, v),
+        }
+    }
+    env_str.trim_end_matches(", ");
+    format!("{} }}", env_str)
 }
 
 pub type Env = HashMap<String, Value>;

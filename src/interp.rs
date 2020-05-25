@@ -27,7 +27,7 @@ pub fn interp_program(defs: Vec<Annotated<Defn>>) -> InterpResult {
         );
     }
 
-    // println!("{:?}", env_rc); // TODO: figure out how to not print cyclic pointers
+    // println!("{}", print_env_safe(&env_rc));
     if let Some(Value::CloV(_, arg, body, env)) = env_rc.get("main".into()) {
         return interp_expr(body.clone(), &env);
     }
@@ -48,7 +48,7 @@ fn interp_fn_defs(denv: DefEnv, def: Annotated<Defn>) -> DefEnv {
                     arg0,
                     xs.iter().fold(
                         box Annotated::zero(*app), // TODO: use actual locations here
-                        |acc, x| box Annotated::zero(Expr::FnE(x.into(), acc)),
+                        |acc, x| box Annotated::zero(Expr::FnE(None, x.into(), acc)),
                     ),
                 ),
             )
@@ -168,7 +168,20 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             interp(e1, env)?;
             interp(e2, env)
         }
-        FnE(x, body) => Ok(CloV(None, x, body, Rc::new(env.clone()))),
+        FnE(name, x, body) => {
+            match name {
+                Some(name) => {
+                    let env_cell = RefCell::new(env.clone());
+                    let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
+                    env_cell.borrow_mut().insert(
+                        name.clone(),
+                        Value::CloV(Some(name.clone()), x, body, env_rc.clone()),
+                    );
+                    Ok(env_rc.get(&name).unwrap().clone())
+                },
+                None => Ok(CloV(None, x, body, Rc::new(env.clone())))
+            }
+        },
         AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
             (CloV(_, arg, body, mut local_env), arg_v) => {
                 interp(body, &local_env.update(arg, arg_v))

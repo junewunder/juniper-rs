@@ -57,96 +57,67 @@ fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<A
 fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
     let mut levels: HashMap<usize, Rc<Mixes<TokenBuffer, Box<Annotated<Expr>>>>> = HashMap::new();
 
-    levels.insert(
-        P_SEMI,
-        Rc::new(Mixes {
-            infix_l: Rc::new(box anno_infix_parser(p_seq)),
-            postfix: un_op(ttag(&T_SEMICOLON), box |lhs| lhs),
-            ..Mixes::default()
-        }),
-    );
+    macro_rules! new_op {
+        ($precedence:ident { $($kind:ident : $parser:expr)* }) => {
+            levels.insert(
+                $precedence,
+                Rc::new(Mixes {
+                    $($kind: Rc::new(Box::new($parser)),)*
+                    ..Mixes::default()
+                }),
+            );
+        }
+    }
 
-    levels.insert(
-        P_LAM,
-        Rc::new(Mixes {
-            prefix: Rc::new(box anno_prefix_parser(p_func)),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_SEMI {
+        infix_l: anno_infix_parser(p_seq)
+        postfix: |input| {
+            let (input, _) = ttag(&T_SEMICOLON)(input)?;
+            Ok((input, box |lhs| lhs))
+        }
+    });
 
-    levels.insert(
-        P_LET,
-        Rc::new(Mixes {
-            prefix: Rc::new(box anno_prefix_parser(alt((
-                p_let, p_if, p_while, p_mutable, p_mutate,
-            )))),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_LAM {
+        prefix: anno_prefix_parser(alt((p_func_named, p_func_anon)))
+    });
 
-    levels.insert(
-        P_OR,
-        Rc::new(Mixes {
-            infix_l: Rc::new(box anno_infix_parser(p_or)),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_LET {
+        prefix: anno_prefix_parser(alt((
+            p_let, p_if, p_while, p_mutable, p_mutate,
+        )))
+    });
 
-    levels.insert(
-        P_AND,
-        Rc::new(Mixes {
-            infix_l: Rc::new(box anno_infix_parser(p_and)),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_OR {
+        infix_l: anno_infix_parser(p_or)
+    });
 
-    levels.insert(
-        P_CMP,
-        Rc::new(Mixes {
-            infix: Rc::new(box anno_infix_parser(alt((p_eq, p_lt, p_gt)))),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_AND {
+        infix_l: anno_infix_parser(p_and)
+    });
 
-    levels.insert(
-        P_SUM,
-        Rc::new(Mixes {
-            infix_l: Rc::new(box anno_infix_parser(alt((p_add, p_sub)))),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_CMP {
+        infix: anno_infix_parser(alt((p_eq, p_lt, p_gt)))
+    });
 
-    levels.insert(
-        P_PROD,
-        Rc::new(Mixes {
-            infix_l: Rc::new(box anno_infix_parser(alt((p_mult, p_div)))),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_SUM {
+        infix_l: anno_infix_parser(alt((p_add, p_sub)))
+    });
 
-    levels.insert(
-        P_NEG,
-        Rc::new(Mixes {
-            prefix: Rc::new(box anno_prefix_parser(p_neg)),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_PROD {
+        infix_l: anno_infix_parser(alt((p_mult, p_div)))
+    });
 
-    levels.insert(
-        P_APP,
-        Rc::new(Mixes {
-            infix_l: Rc::new(box anno_infix_parser(p_app)),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_NEG {
+        prefix: anno_prefix_parser(p_neg)
+    });
 
-    levels.insert(
-        P_DEREF,
-        Rc::new(Mixes {
-            prefix: Rc::new(box anno_prefix_parser(p_deref)),
-            ..Mixes::default()
-        }),
-    );
+    new_op!(P_APP {
+        infix_l: anno_infix_parser(p_app)
+    });
+
+    new_op!(P_DEREF {
+        prefix: anno_prefix_parser(p_deref)
+    });
 
     MixfixParser {
         terminals: annotated_terminal(box p_terminals),
@@ -208,6 +179,9 @@ fn p_terminals(input: TokenBuffer) -> ExprIResult {
 
 fn p_var(input: TokenBuffer) -> ExprIResult {
     let (input, x) = take_ident(input)?;
+    if peek(ttag(&T_FAT_ARROW_R))(input.clone()).is_ok() {
+        return Err(Err::Error(ParseError::from_error_kind(input, ErrorKind::Tag)));
+    }
     Ok((input, VarE(x)))
 }
 
@@ -275,19 +249,19 @@ pub fn p_while(input: TokenBuffer) -> UnOpIResult {
     Ok((input, box move |body| WhileE(pred.clone(), body.clone())))
 }
 
-pub fn p_func(input: TokenBuffer) -> UnOpIResult {
-    let (input, _) = opt(ttag(&T_FN))(input)?;
+pub fn p_func_anon(input: TokenBuffer) -> UnOpIResult {
     let (input, x) = take_ident(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    Ok((input, box move |body| FnE(x.clone(), body)))
-    // let (input, xs) = many1(|input| {
-    //     let (input, x) = take_ident(input)?;
-    //     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    //     Ok((input, x))
-    // })(input)?;
-    // Ok((input, box |body| {
-    //     **xs.iter().rev().fold(body, |acc, x| FnE(x.clone(), acc))
-    // }))
+    Ok((input, box move |body| FnE(None, x.clone(), body)))
+}
+
+pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
+    let (input, _) = opt(ttag(&T_FN))(input)?;
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_COLONCOLON)(input)?;
+    let (input, arg) = take_ident(input)?;
+    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
+    Ok((input, box move |body| FnE(Some(name.clone()), arg.clone(), body)))
 }
 
 macro_rules! unop {
