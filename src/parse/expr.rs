@@ -120,7 +120,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
     });
 
     MixfixParser {
-        terminals: annotated_terminal(box p_terminals),
+        terminals: Rc::new(box annotated_terminal(box p_terminals)),
         levels,
     }
 }
@@ -137,27 +137,6 @@ pub fn init_p_expr() {
             P_EXPR_VALUE = Some(mp.build_parser())
         }
     }
-}
-
-fn annotated_terminal(
-    parser: Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Expr>>,
-) -> Rc<Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>>>> {
-    Rc::new(box move |input: TokenBuffer| {
-        let idx = input.first().map(|x| x.idx);
-        let last_idx_len = input.last().map(|x| x.idx + x.len);
-        if idx.is_none() || last_idx_len.is_none() {
-            return Err(Err::Error(ParseError::from_error_kind(
-                input,
-                ErrorKind::Tag,
-            )));
-        }
-        let idx = idx.unwrap();
-        let len = last_idx_len.unwrap() - idx;
-
-        let (input, tok) = parser(input)?;
-        let len = input.first().map(|x| x.idx - idx).unwrap_or(len);
-        Ok((input, box Annotated { tok, idx, len }))
-    })
 }
 
 pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> {
@@ -187,7 +166,7 @@ fn p_var(input: TokenBuffer) -> ExprIResult {
 
 fn p_bool(input: TokenBuffer) -> ExprIResult {
     let (input, b) = alt((ttag(&T_TRUE), ttag(&T_FALSE)))(input)?;
-    let b = b == *T_TRUE;
+    let b = b.unwrap() == *T_TRUE;
     Ok((input, BoolE(b)))
 }
 

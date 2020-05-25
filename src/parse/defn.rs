@@ -1,4 +1,4 @@
-use crate::annotate::Annotated;
+use crate::annotate::*;
 use crate::data::{Defn, Expr};
 use crate::lex::{
     self, take_ident, ttag,
@@ -24,8 +24,8 @@ use nom::{
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Annotated<Defn>>> {
-    let (input, defs) = many0(alt((p_fn_named, p_prim)))(input)?;
+pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
+    let (input, defs) = many0(annotated_terminal(alt((p_fn_named, p_prim))))(input)?;
 
     Ok((
         input,
@@ -51,19 +51,13 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
 
     Ok((
         input,
-        Annotated {
-            tok: Defn::FnD(
-                name,
-                x_top,
-                xs.into_iter().fold(body, |acc, x| box Annotated {
-                    tok: Expr::FnE(None, x.clone(), acc),
-                    idx: 0,
-                    len: 0,
-                }),
-            ),
-            idx: 0,
-            len: 0,
-        },
+        Defn::FnD(
+            name,
+            x_top,
+            xs.into_iter().fold(body, |acc, x| box Annotated::zero(
+                Expr::FnE(None, x.clone(), acc)
+            )),
+        )
     ))
 }
 
@@ -73,12 +67,26 @@ pub fn p_prim(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, xs) = separated_nonempty_list(ttag(&T_COMMA), take_ident)(input)?;
 
-    Ok((
-        input,
-        Annotated {
-            tok: Defn::PrimD(name, xs),
-            idx: 0,
-            len: 0,
-        },
-    ))
+    Ok((input, Defn::PrimD(name, xs)))
 }
+
+// fn annotated_terminal(
+//     parser: Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Defn>>,
+// ) -> Rc<Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Defn>>>>> {
+//     Rc::new(box move |input: TokenBuffer| {
+//         let idx = input.first().map(|x| x.idx);
+//         let last_idx_len = input.last().map(|x| x.idx + x.len);
+//         if idx.is_none() || last_idx_len.is_none() {
+//             return Err(Err::Error(ParseError::from_error_kind(
+//                 input,
+//                 ErrorKind::Tag,
+//             )));
+//         }
+//         let idx = idx.unwrap();
+//         let len = last_idx_len.unwrap() - idx;
+//
+//         let (input, tok) = parser(input)?;
+//         let len = input.first().map(|x| x.idx - idx).unwrap_or(len);
+//         Ok((input, box Annotated { tok, idx, len }))
+//     })
+// }

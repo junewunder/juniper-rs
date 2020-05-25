@@ -196,7 +196,7 @@ pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
 }
 
 /// token tag
-pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Token> {
+pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Annotated<Token>> {
     let tag = tag.clone();
     move |input: TokenBuffer| {
         let mut input = input.clone();
@@ -205,8 +205,9 @@ pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Token> 
             return Err(Err::Error(ParseError::from_error_kind(input, e)));
         };
 
-        if input.remove(0).tok == tag {
-            return Ok((input, tag.clone()));
+        let tok = input.remove(0);
+        if tag == tok.tok {
+            return Ok((input, tok));
         };
 
         let e: ErrorKind = ErrorKind::Tag;

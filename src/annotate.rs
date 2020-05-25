@@ -38,7 +38,6 @@ impl<T> Annotated<T> {
 impl<T: fmt::Debug> fmt::Debug for Annotated<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{:?}", self.tok)
-        // write!(f, "{:?}@<{}:{}>", self.tok, self.idx, self.len)
     }
 }
 
@@ -48,11 +47,34 @@ impl<T: fmt::Display> fmt::Display for Annotated<T> {
     }
 }
 
-pub fn anno_prefix_parser<T, F>(
+pub fn annotated_terminal<T, F, O>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<Expr>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<Annotated<O>>>
+where F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, O>
+{
+    move |input: Vec<Annotated<T>>| {
+        let idx = input.first().map(|x| x.idx);
+        let last_idx_len = input.last().map(|x| x.idx + x.len);
+        if idx.is_none() || last_idx_len.is_none() {
+            return Err(Err::Error(ParseError::from_error_kind(
+                input,
+                ErrorKind::Tag,
+            )));
+        }
+        let idx = idx.unwrap();
+        let len = last_idx_len.unwrap() - idx;
+
+        let (input, tok) = parser(input)?;
+        let len = input.first().map(|x| x.idx - idx).unwrap_or(len);
+        Ok((input, box Annotated { tok, idx, len }))
+    }
+}
+
+pub fn anno_prefix_parser<T, F, O: 'static>(
+    parser: F,
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<O>>>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<Expr>>>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<O>>>,
 {
     move |input| {
         let idx = input.first().map(|x| x.idx);
@@ -66,7 +88,7 @@ where
 
         let (input, cb_pre) = parser(input)?;
 
-        let cb_post: Box<dyn PostAnnoUnOp<Expr>> = box move |x: Box<Annotated<Expr>>| {
+        let cb_post: Box<dyn PostAnnoUnOp<O>> = box move |x: Box<Annotated<O>>| {
             let len = x.idx + x.len - idx;
             let tok = (cb_pre)(x);
             box Annotated { tok, idx, len }
@@ -75,11 +97,11 @@ where
     }
 }
 
-pub fn anno_postfix_parser<T, F>(
+pub fn anno_postfix_parser<T, F, O: 'static>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<Expr>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<O>>>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<Expr>>>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<O>>>,
 {
     move |input| {
         let post_idx = input.first().map(|x| x.idx);
@@ -95,7 +117,7 @@ where
 
         let (input, cb_pre) = parser(input)?;
 
-        let cb_post: Box<dyn PostAnnoUnOp<Expr>> = box move |x: Box<Annotated<Expr>>| {
+        let cb_post: Box<dyn PostAnnoUnOp<O>> = box move |x: Box<Annotated<O>>| {
             let idx = x.idx;
             let len = post_idx - idx + post_len;
             let tok = (cb_pre)(x);
@@ -105,15 +127,15 @@ where
     }
 }
 
-pub fn anno_infix_parser<T, F>(
+pub fn anno_infix_parser<T, F, O: 'static>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoBinOp<Expr>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoBinOp<O>>>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoBinOp<Expr>>>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoBinOp<O>>>,
 {
     move |input| {
         let (input, cb_pre) = parser(input)?;
-        let cb_post: Box<dyn PostAnnoBinOp<Expr>> = box move |lhs, rhs| {
+        let cb_post: Box<dyn PostAnnoBinOp<O>> = box move |lhs, rhs| {
             let idx = lhs.idx;
             let len = rhs.idx - idx + rhs.len;
             let tok = (cb_pre)(lhs, rhs);

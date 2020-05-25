@@ -8,7 +8,7 @@ use std::rc::Rc;
 type DefEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
 pub type InterpResult = std::result::Result<Value, InterpError>;
 
-pub fn interp_program(defs: Vec<Annotated<Defn>>) -> InterpResult {
+pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     let mut env_init: Env = vec![
         ("delay".into(), Value::PrimV("delay".into())),
         ("print".into(), Value::PrimV("print".into())),
@@ -35,7 +35,7 @@ pub fn interp_program(defs: Vec<Annotated<Defn>>) -> InterpResult {
     panic!("no <main> method")
 }
 
-fn interp_fn_defs(denv: DefEnv, def: Annotated<Defn>) -> DefEnv {
+fn interp_fn_defs(denv: DefEnv, def: Box<Annotated<Defn>>) -> DefEnv {
     use Defn::*;
     match def.unwrap() {
         FnD(name, x, expr) => denv.update(name, (x, expr)),
@@ -47,7 +47,7 @@ fn interp_fn_defs(denv: DefEnv, def: Annotated<Defn>) -> DefEnv {
                 (
                     arg0,
                     xs.iter().fold(
-                        box Annotated::zero(*app), // TODO: use actual locations here
+                        box Annotated::zero(*app),
                         |acc, x| box Annotated::zero(Expr::FnE(None, x.into(), acc)),
                     ),
                 ),
