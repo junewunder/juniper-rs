@@ -21,3 +21,5 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - REPL functionality
  - custom parser error type
  - parse values from command line to main function
+ - detect when mut value is trying to be used without being dereferenced
+ - use Weak reference counting in CloV
