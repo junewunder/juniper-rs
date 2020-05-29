@@ -214,10 +214,15 @@ where
 {
     move |input: Vec<I>| {
         let mut input = input.clone();
-        let err = |input| Err(Err::Error(ParseError::from_error_kind(input, ErrorKind::TakeTill1)));
+        let err = |input| {
+            Err(Err::Error(ParseError::from_error_kind(
+                input,
+                ErrorKind::TakeTill1,
+            )))
+        };
 
         if input.len() == 0 {
-            return err(input)
+            return err(input);
         };
 
         let first = input.remove(0);

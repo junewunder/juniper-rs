@@ -12,7 +12,7 @@ pub enum Defn {
     FnD(String, String, Wrap<Expr>),
     PrimD(String, Vec<String>),
     StructD(String, Vec<String>),
-    EnumD(String, HashMap<String, Vec<String>>)
+    EnumD(String, HashMap<String, Vec<String>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -30,11 +30,7 @@ pub enum Expr {
     EqE(Wrap<Expr>, Wrap<Expr>),
     LtE(Wrap<Expr>, Wrap<Expr>),
     GtE(Wrap<Expr>, Wrap<Expr>),
-    IfE(
-        Wrap<Expr>,
-        Wrap<Expr>,
-        Wrap<Expr>,
-    ),
+    IfE(Wrap<Expr>, Wrap<Expr>, Wrap<Expr>),
 
     StringE(String),
 
@@ -104,10 +100,12 @@ impl Display for Value {
                 write!(f, "<fn {} :: {} {}>", name, arg, print_env_safe(env))
             }
             ObjectV(name, fields) => {
-                let name = name.clone()
+                let name = name
+                    .clone()
                     .map(|name| name + " ")
                     .unwrap_or_else(|| String::new());
-                let fields: String = fields.iter()
+                let fields: String = fields
+                    .iter()
                     .map(|(k, v)| format!("  {}: {},", k, v))
                     .fold(String::new(), |acc, pair| format!("{}{}\n", acc, pair));
                 write!(f, "{}{{\n{}}}", name, fields)
@@ -117,14 +115,16 @@ impl Display for Value {
                 let mut args_str = String::new();
                 if args.len() > 0 {
                     args_str = format!("{}({}", args_str, args.remove(0));
-                    args_str = args.iter().fold(args_str, |acc, arg| format!("{}, {}", acc, arg));
+                    args_str = args
+                        .iter()
+                        .fold(args_str, |acc, arg| format!("{}, {}", acc, arg));
                     args_str += ")".into();
                 }
                 write!(f, "{}::{}{}", enum_name, variant, args_str)
             }
             // StructV(name, fields) => {}
             NullV => write!(f, "null"),
-            x => write!(f, "{:?}", x)
+            x => write!(f, "{:?}", x),
         }
     }
 }
@@ -133,9 +133,7 @@ pub fn print_env_safe(env: &Rc<Env>) -> String {
     let mut env_str = format!("{{ ");
     for (k, v) in env.iter() {
         match v {
-            Value::CloV(_, arg, _, _) => {
-                env_str = format!("{}{}: <fn {}>, ", env_str, k, arg)
-            },
+            Value::CloV(_, arg, _, _) => env_str = format!("{}{}: <fn {}>, ", env_str, k, arg),
             _ => env_str = format!("{}: {}, ", k, v),
         }
     }

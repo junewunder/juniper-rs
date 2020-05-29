@@ -7,6 +7,7 @@ use crate::lex::{
 use crate::mixfix::mixfix::{BinOp, UnOp};
 use nom::IResult;
 
+#[rustfmt::skip]
 lazy_static! {
     pub static ref T_TRUE: Token           = Prim("true".into());
     pub static ref T_FALSE: Token          = Prim("false".into());

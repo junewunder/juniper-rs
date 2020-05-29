@@ -49,38 +49,38 @@ fn interp_scopeless_defs(env: Env, def: &Box<Annotated<Defn>>) -> Env {
     use Defn::*;
     use Value::*;
     match def.cloned() {
-        StructD(name, fields) => env.update(
-            name.clone(),
-            Value::StructV(name.clone(), fields.clone())
-        ),
+        StructD(name, fields) => {
+            env.update(name.clone(), Value::StructV(name.clone(), fields.clone()))
+        }
         PrimD(name, mut xs) => {
             let app = box Expr::AppPrimE(name.clone(), xs.clone());
             let arg0 = xs.remove(0);
-            let body = xs.iter().fold(
-                box Annotated::zero(*app),
-                |acc, x| box Annotated::zero(Expr::FnE(None, x.into(), acc)),
-            );
+            let body = xs.iter().fold(box Annotated::zero(*app), |acc, x| {
+                box Annotated::zero(Expr::FnE(None, x.into(), acc))
+            });
             env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
         }
-        EnumD(enum_name, variants) => {
-            variants.iter().fold(env, |env, (name, xs)| {
-                if xs.len() == 0 {
-                    return env.update(
-                        name.clone(),
-                        Value::EnumV(enum_name.clone(), name.clone(), Vec::with_capacity(0))
-                    )
-                }
-                let mut xs = xs.clone();
-                let init_enum_var = Expr::InitEnumVariantE(enum_name.clone(), name.clone(), xs.clone());
-                let arg0 = xs.remove(0);
-                let body = xs.iter().fold(
-                    box Annotated::zero(init_enum_var),
-                    |acc, x| box Annotated::zero(Expr::FnE(None, x.into(), acc)),
+        EnumD(enum_name, variants) => variants.iter().fold(env, |env, (name, xs)| {
+            if xs.len() == 0 {
+                return env.update(
+                    name.clone(),
+                    Value::EnumV(enum_name.clone(), name.clone(), Vec::with_capacity(0)),
                 );
-                env.update(name.clone(), CloV(None, arg0, body, Rc::new(HashMap::new())))
-            })
-        }
-        _ => env
+            }
+            let mut xs = xs.clone();
+            let init_enum_var = Expr::InitEnumVariantE(enum_name.clone(), name.clone(), xs.clone());
+            let arg0 = xs.remove(0);
+            let body = xs
+                .iter()
+                .fold(box Annotated::zero(init_enum_var), |acc, x| {
+                    box Annotated::zero(Expr::FnE(None, x.into(), acc))
+                });
+            env.update(
+                name.clone(),
+                CloV(None, arg0, body, Rc::new(HashMap::new())),
+            )
+        }),
+        _ => env,
     }
 }
 
@@ -197,19 +197,17 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             interp(e1, env)?;
             interp(e2, env)
         }
-        FnE(name, x, body) => {
-            match name {
-                Some(name) => {
-                    let env_cell = RefCell::new(env.clone());
-                    let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
-                    env_cell.borrow_mut().insert(
-                        name.clone(),
-                        Value::CloV(Some(name.clone()), x, body, env_rc.clone()),
-                    );
-                    Ok(env_rc.get(&name).unwrap().clone())
-                },
-                None => Ok(CloV(None, x, body, Rc::new(env.clone())))
+        FnE(name, x, body) => match name {
+            Some(name) => {
+                let env_cell = RefCell::new(env.clone());
+                let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
+                env_cell.borrow_mut().insert(
+                    name.clone(),
+                    Value::CloV(Some(name.clone()), x, body, env_rc.clone()),
+                );
+                Ok(env_rc.get(&name).unwrap().clone())
             }
+            None => Ok(CloV(None, x, body, Rc::new(env.clone()))),
         },
         AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
             (CloV(_, arg, body, mut local_env), arg_v) => {
@@ -244,12 +242,12 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         InitStructE(name, fields) => {
             let allowed_fields = match env.get(&name) {
                 Some(StructV(name, fields)) => fields,
-                _ => return err!(UndefinedError(name))
+                _ => return err!(UndefinedError(name)),
             };
             let mut field_vs = HashMap::new();
             for (x, e) in fields.into_iter() {
                 if !allowed_fields.contains(&x) {
-                    return err!(ExtraFieldError(x))
+                    return err!(ExtraFieldError(x));
                 }
                 field_vs.insert(x, Rc::new(interp(e, env)?));
             }
@@ -257,27 +255,28 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             let keys: Vec<&String> = field_vs.keys().collect();
             for x in allowed_fields.iter() {
                 if !keys.contains(&x) {
-                    return err!(MissingFieldError(x.clone()))
+                    return err!(MissingFieldError(x.clone()));
                 }
             }
 
             Ok(ObjectV(Some(name), field_vs))
         }
         InitEnumVariantE(enum_name, variant, args) => {
-            let args = args.iter().map(|arg| env.get(arg).unwrap().clone()).collect();
+            let args = args
+                .iter()
+                .map(|arg| env.get(arg).unwrap().clone())
+                .collect();
             Ok(EnumV(enum_name, variant, args))
         }
         AccessE(e, x) => {
             let v = match interp(e, env)? {
-                ObjectV(_, fields) => {
-                    fields.get(&x).cloned().ok_or_else(|| InterpError {
-                        kind: UndefinedError(x),
-                        idx: err_idx,
-                        len: err_len,
-                        loc: None,
-                    })?
-                }
-                _ => return err!(TypeError)
+                ObjectV(_, fields) => fields.get(&x).cloned().ok_or_else(|| InterpError {
+                    kind: UndefinedError(x),
+                    idx: err_idx,
+                    len: err_len,
+                    loc: None,
+                })?,
+                _ => return err!(TypeError),
             };
 
             Ok(RefV(v))

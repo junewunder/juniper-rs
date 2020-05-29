@@ -12,10 +12,10 @@ use nom::{
     branch::alt,
     bytes::complete::take_until,
     character::complete::{alpha1, char, space0, space1},
-    combinator::{map, opt},
     combinator::{complete, not, peek},
+    combinator::{map, opt},
     error::{ErrorKind, ParseError},
-    multi::{fold_many0, many0, many1, separated_nonempty_list, separated_list},
+    multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
     Err, IResult,
@@ -25,10 +25,7 @@ use std::rc::Rc;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
     let (input, defs) = many0(annotated_terminal(alt((
-        p_fn_named,
-        p_prim,
-        p_struct,
-        p_enum,
+        p_fn_named, p_prim, p_struct, p_enum,
     ))))(input)?;
 
     Ok((input, defs))
@@ -52,10 +49,10 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
         Defn::FnD(
             name,
             x_top,
-            xs.into_iter().fold(body, |acc, x| box Annotated::zero(
-                Expr::FnE(None, x.clone(), acc)
-            )),
-        )
+            xs.into_iter().fold(body, |acc, x| {
+                box Annotated::zero(Expr::FnE(None, x.clone(), acc))
+            }),
+        ),
     ))
 }
 

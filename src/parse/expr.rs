@@ -19,7 +19,7 @@ use nom::{
     combinator::map,
     combinator::{complete, not, opt, peek},
     error::{ErrorKind, ParseError},
-    multi::{fold_many0, many0, many1, separated_nonempty_list, separated_list},
+    multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
     Err, IResult,
@@ -83,9 +83,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
     });
 
     new_op!(P_LET {
-        prefix: anno_prefix_parser(alt((
-            p_let, p_if, p_while, p_mutable, p_mutate,
-        )))
+        prefix: anno_prefix_parser(alt((p_let, p_if, p_while, p_mutable, p_mutate,)))
     });
 
     new_op!(P_OR {
@@ -158,13 +156,24 @@ pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> 
 }
 
 fn p_terminals(input: TokenBuffer) -> ExprIResult {
-    alt((p_num, p_bool, p_string, p_parens, p_init_object, p_init_struct, p_var))(input)
+    alt((
+        p_num,
+        p_bool,
+        p_string,
+        p_parens,
+        p_init_object,
+        p_init_struct,
+        p_var,
+    ))(input)
 }
 
 fn p_var(input: TokenBuffer) -> ExprIResult {
     let (input, x) = take_ident(input)?;
     if peek(ttag(&T_FAT_ARROW_R))(input.clone()).is_ok() {
-        return Err(Err::Error(ParseError::from_error_kind(input, ErrorKind::Tag)));
+        return Err(Err::Error(ParseError::from_error_kind(
+            input,
+            ErrorKind::Tag,
+        )));
     }
     Ok((input, VarE(x)))
 }
@@ -271,7 +280,9 @@ pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, arg) = take_ident(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    Ok((input, box move |body| FnE(Some(name.clone()), arg.clone(), body)))
+    Ok((input, box move |body| {
+        FnE(Some(name.clone()), arg.clone(), body)
+    }))
 }
 
 fn p_access(input: TokenBuffer) -> UnOpIResult {
