@@ -1,5 +1,5 @@
 use crate::data::Expr;
-use crate::parse::types::*;
+use crate::parse::shared::*;
 use nom::IResult;
 use nom::{
     error::{ErrorKind, ParseError},
@@ -32,6 +32,11 @@ impl<T> Annotated<T> {
 
     pub fn unwrap(self) -> T {
         self.tok
+    }
+
+    pub fn cloned(&self) -> T
+    where T: Clone {
+        self.tok.clone()
     }
 }
 

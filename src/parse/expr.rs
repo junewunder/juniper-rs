@@ -9,7 +9,7 @@ use crate::mixfix::{
     combinator::{bin_op, un_op},
     mixfix::*,
 };
-use crate::parse::types::*;
+use crate::parse::shared::*;
 use core::fmt::Error;
 use nom::{
     self,
@@ -19,7 +19,7 @@ use nom::{
     combinator::map,
     combinator::{complete, not, opt, peek},
     error::{ErrorKind, ParseError},
-    multi::{fold_many0, many0, many1, separated_nonempty_list},
+    multi::{fold_many0, many0, many1, separated_nonempty_list, separated_list},
     sequence::delimited,
     sequence::pair,
     Err, IResult,
@@ -42,6 +42,7 @@ const P_POW: usize = 180; // todo
 const P_FAC: usize = 190; // todo
 const P_APP: usize = 200; // todo
 const P_DEREF: usize = 210;
+const P_ACCESS: usize = 220;
 
 fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<Annotated<Expr>> {
     let idx = tokbuf_before.first().unwrap().idx;
@@ -119,6 +120,10 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
         prefix: anno_prefix_parser(p_deref)
     });
 
+    new_op!(P_ACCESS {
+        postfix: anno_postfix_parser(p_access)
+    });
+
     MixfixParser {
         terminals: Rc::new(box annotated_terminal(box p_terminals)),
         levels,
@@ -153,7 +158,7 @@ pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> 
 }
 
 fn p_terminals(input: TokenBuffer) -> ExprIResult {
-    alt((p_var, p_num, p_bool, p_string, p_parens))(input)
+    alt((p_num, p_bool, p_string, p_parens, p_init_object, p_init_struct, p_var))(input)
 }
 
 fn p_var(input: TokenBuffer) -> ExprIResult {
@@ -175,6 +180,32 @@ fn p_parens(input: TokenBuffer) -> ExprIResult {
     let (input, e) = p_expr(input)?;
     let (input, _) = ttag(&T_CL_PAREN)(input)?;
     Ok((input, (*e).unwrap()))
+}
+
+fn p_string_expr_pair(input: TokenBuffer) -> IResult<TokenBuffer, (String, Box<Annotated<Expr>>)> {
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_COLON)(input)?;
+    let (input, value) = p_expr(input)?;
+
+    Ok((input, (name, value)))
+}
+
+fn p_init_struct(input: TokenBuffer) -> ExprIResult {
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
+    let (input, fields) = separated_list(ttag(&T_COMMA), p_string_expr_pair)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
+    Ok((input, InitStructE(name, fields.into())))
+}
+
+fn p_init_object(input: TokenBuffer) -> ExprIResult {
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
+    let (input, fields) = separated_list(ttag(&T_COMMA), p_string_expr_pair)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
+
+    Ok((input, InitObjectE(fields)))
 }
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
@@ -241,6 +272,12 @@ pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
     let (input, arg) = take_ident(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     Ok((input, box move |body| FnE(Some(name.clone()), arg.clone(), body)))
+}
+
+fn p_access(input: TokenBuffer) -> UnOpIResult {
+    let (input, _) = ttag(&T_DOT)(input)?;
+    let (input, x) = take_ident(input)?;
+    Ok((input, box move |lhs| AccessE(lhs, x.clone())))
 }
 
 macro_rules! unop {
