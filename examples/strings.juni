@@ -1,5 +1,3 @@
-prim print :: x
-
 fn greet :: greeting => name =>
   print (greeting + ", " + name);
 

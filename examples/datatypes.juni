@@ -1,0 +1,41 @@
+enum Nat {
+  Zero,
+  Suc(n),
+}
+
+struct Person {
+  name,
+  age,
+  fav_food,
+  is_cool
+}
+
+struct Point {
+  x,
+  y,
+}
+
+fn mkPoint :: x => y => Point { x: x, y: y }
+
+fn main :: x => (
+  let person = Person {
+    name: "June",
+    age: 22,
+    fav_food: "curry",
+    is_cool: true,
+  } in
+  let obj = {
+    name: "June",
+    age: 22,
+    fav_food: "curry",
+    is_cool: true,
+  } in (
+    print person;
+    print obj;
+    print person.name;
+    print obj.fav_food;
+    print (mkPoint 5 6);
+    print ("(5,6) is represented as " + (mkPoint 5 6));
+    print (Suc(Suc(Suc Zero)));
+  )
+)

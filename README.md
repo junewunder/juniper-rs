@@ -11,13 +11,18 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - while loops
  - primitives
  - error reporting on interpreting
+ - arrays/objects/structs
 
 ## features to do:
 
- - arrays/objects/structs
  - match/case analysis
  - error reporting on parsing
  - top level constants
  - REPL functionality
  - custom parser error type
  - parse values from command line to main function
+ - detect when mut value is trying to be used without being dereferenced
+ - use Weak reference counting in CloV
+ - strange out-of-bounds error when interp error is found on last line of file
+ - mutable struct values
+ - optional typing in struct values

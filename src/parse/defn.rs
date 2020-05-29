@@ -5,18 +5,17 @@ use crate::lex::{
     Token::{self, *},
     TokenBuffer,
 };
-use crate::parse::types::*;
-use crate::parse::{expr::p_expr, types::*};
+use crate::parse::{expr::p_expr, shared::*};
 use core::fmt::Error;
 use nom::{
     self,
     branch::alt,
     bytes::complete::take_until,
     character::complete::{alpha1, char, space0, space1},
-    combinator::map,
     combinator::{complete, not, peek},
+    combinator::{map, opt},
     error::{ErrorKind, ParseError},
-    multi::{fold_many0, many0, many1, separated_nonempty_list},
+    multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
     Err, IResult,
@@ -25,15 +24,11 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
-    let (input, defs) = many0(annotated_terminal(alt((p_fn_named, p_prim))))(input)?;
+    let (input, defs) = many0(annotated_terminal(alt((
+        p_fn_named, p_prim, p_struct, p_enum,
+    ))))(input)?;
 
-    Ok((
-        input,
-        defs.into_iter().fold(Vec::new(), |mut defs, def| {
-            defs.push(def);
-            defs
-        }),
-    ))
+    Ok((input, defs))
 }
 
 pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
@@ -54,10 +49,10 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
         Defn::FnD(
             name,
             x_top,
-            xs.into_iter().fold(body, |acc, x| box Annotated::zero(
-                Expr::FnE(None, x.clone(), acc)
-            )),
-        )
+            xs.into_iter().fold(body, |acc, x| {
+                box Annotated::zero(Expr::FnE(None, x.clone(), acc))
+            }),
+        ),
     ))
 }
 
@@ -70,23 +65,38 @@ pub fn p_prim(input: TokenBuffer) -> DefnIResult {
     Ok((input, Defn::PrimD(name, xs)))
 }
 
-// fn annotated_terminal(
-//     parser: Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Defn>>,
-// ) -> Rc<Box<dyn Fn(TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Defn>>>>> {
-//     Rc::new(box move |input: TokenBuffer| {
-//         let idx = input.first().map(|x| x.idx);
-//         let last_idx_len = input.last().map(|x| x.idx + x.len);
-//         if idx.is_none() || last_idx_len.is_none() {
-//             return Err(Err::Error(ParseError::from_error_kind(
-//                 input,
-//                 ErrorKind::Tag,
-//             )));
-//         }
-//         let idx = idx.unwrap();
-//         let len = last_idx_len.unwrap() - idx;
-//
-//         let (input, tok) = parser(input)?;
-//         let len = input.first().map(|x| x.idx - idx).unwrap_or(len);
-//         Ok((input, box Annotated { tok, idx, len }))
-//     })
-// }
+pub fn p_struct(input: TokenBuffer) -> DefnIResult {
+    let (input, _) = ttag(&T_STRUCT)(input)?;
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
+    let (input, fields) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
+
+    Ok((input, Defn::StructD(name, fields)))
+}
+
+pub fn p_enum(input: TokenBuffer) -> DefnIResult {
+    let (input, _) = ttag(&T_ENUM)(input)?;
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
+    let (input, variants) = separated_list(ttag(&T_COMMA), p_enum_field)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
+
+    Ok((input, Defn::EnumD(name, variants.into())))
+}
+
+fn p_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>)> {
+    let (input, name) = take_ident(input)?;
+    let (input, variants) = opt(|input| {
+        let (input, _) = ttag(&T_OP_PAREN)(input)?;
+        let (input, variants) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
+        let (input, _) = opt(ttag(&T_COMMA))(input)?;
+        let (input, _) = opt(ttag(&T_COMMA))(input)?;
+        let (input, _) = ttag(&T_CL_PAREN)(input)?;
+        Ok((input, variants))
+    })(input)?;
+
+    Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
+}

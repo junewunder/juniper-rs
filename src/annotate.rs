@@ -1,5 +1,5 @@
 use crate::data::Expr;
-use crate::parse::types::*;
+use crate::parse::shared::*;
 use nom::IResult;
 use nom::{
     error::{ErrorKind, ParseError},
@@ -33,6 +33,13 @@ impl<T> Annotated<T> {
     pub fn unwrap(self) -> T {
         self.tok
     }
+
+    pub fn cloned(&self) -> T
+    where
+        T: Clone,
+    {
+        self.tok.clone()
+    }
 }
 
 impl<T: fmt::Debug> fmt::Debug for Annotated<T> {
@@ -50,7 +57,8 @@ impl<T: fmt::Display> fmt::Display for Annotated<T> {
 pub fn annotated_terminal<T, F, O>(
     parser: F,
 ) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<Annotated<O>>>
-where F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, O>
+where
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, O>,
 {
     move |input: Vec<Annotated<T>>| {
         let idx = input.first().map(|x| x.idx);

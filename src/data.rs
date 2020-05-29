@@ -4,52 +4,56 @@ use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
-#[derive(PartialEq, Debug, Clone)]
+type Wrap<T> = Box<Annotated<T>>;
+type StructFields = Vec<String>;
+
+#[derive(Clone, Debug)]
+pub enum Defn {
+    FnD(String, String, Wrap<Expr>),
+    PrimD(String, Vec<String>),
+    StructD(String, Vec<String>),
+    EnumD(String, HashMap<String, Vec<String>>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
     NumE(f64),
-    PlusE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    MinusE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    MultE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    DivE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    NegE(Box<Annotated<Expr>>),
+    PlusE(Wrap<Expr>, Wrap<Expr>),
+    MinusE(Wrap<Expr>, Wrap<Expr>),
+    MultE(Wrap<Expr>, Wrap<Expr>),
+    DivE(Wrap<Expr>, Wrap<Expr>),
+    NegE(Wrap<Expr>),
 
     BoolE(bool),
-    AndE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    OrE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    EqE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    LtE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    GtE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    IfE(
-        Box<Annotated<Expr>>,
-        Box<Annotated<Expr>>,
-        Box<Annotated<Expr>>,
-    ),
+    AndE(Wrap<Expr>, Wrap<Expr>),
+    OrE(Wrap<Expr>, Wrap<Expr>),
+    EqE(Wrap<Expr>, Wrap<Expr>),
+    LtE(Wrap<Expr>, Wrap<Expr>),
+    GtE(Wrap<Expr>, Wrap<Expr>),
+    IfE(Wrap<Expr>, Wrap<Expr>, Wrap<Expr>),
 
     StringE(String),
 
     VarE(String),
-    LetE(String, Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    LetE(String, Wrap<Expr>, Wrap<Expr>),
 
-    FnE(Option<String>, String, Box<Annotated<Expr>>),
-    AppE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    FnE(Option<String>, String, Wrap<Expr>),
+    AppE(Wrap<Expr>, Wrap<Expr>),
     AppPrimE(String, Vec<String>),
 
-    SeqE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
+    SeqE(Wrap<Expr>, Wrap<Expr>),
 
-    WhileE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    MutableE(String, Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    MutateE(Box<Annotated<Expr>>, Box<Annotated<Expr>>),
-    DerefE(Box<Annotated<Expr>>),
-}
-// TODO:
-// ClassE(Vec<String>, Vec<(String, Expr)>),
-// NewE(Expr, Vec<(String, Expr)>),
-// AccessE(Expr, String)
+    NewE(Wrap<Expr>, Vec<(String, Wrap<Expr>)>),
+    AccessE(Wrap<Expr>, String),
 
-#[derive(Debug)]
-pub enum Defn {
-    FnD(String, String, Box<Annotated<Expr>>),
-    PrimD(String, Vec<String>),
+    WhileE(Wrap<Expr>, Wrap<Expr>),
+    MutableE(String, Wrap<Expr>, Wrap<Expr>),
+    MutateE(Wrap<Expr>, Wrap<Expr>),
+    DerefE(Wrap<Expr>),
+
+    InitStructE(String, HashMap<String, Wrap<Expr>>),
+    InitObjectE(Vec<(String, Wrap<Expr>)>),
+    InitEnumVariantE(String, String, Vec<String>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -58,13 +62,28 @@ pub enum Value {
     BoolV(bool),
     StringV(String),
     MutV(Rc<RefCell<Box<Value>>>),
+    RefV(Rc<Value>),
     PrimV(String),
-    CloV(Option<String>, String, Box<Annotated<Expr>>, Rc<Env>),
-    Null,
+    StructV(String, StructFields),
+    ObjectV(Option<String>, HashMap<String, Rc<Value>>),
+    CloV(Option<String>, String, Wrap<Expr>, Rc<Env>),
+    EnumV(String, String, Vec<Value>),
+    NullV,
 }
-// | ClassV [String] [(String, Expr)] Env
-// | ObjectV (Map String Integer) (Map String Expr) Env
-// deriving (Eq,Ord,Show)
+
+#[derive(Debug)]
+pub enum Type {
+    NumT,
+    BoolT,
+    StringT,
+    MutT(Box<Type>),
+    PrimT,
+    CloT,
+    NullT,
+    AnyT,
+    ObjectT,
+    StructT(String),
+}
 
 impl Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -72,14 +91,40 @@ impl Display for Value {
         match self {
             NumV(n) => write!(f, "{}", n),
             BoolV(b) => write!(f, "{}", b),
-            StringV(s) => write!(f, "{}", s),
+            StringV(s) => write!(f, "\"{}\"", s),
             MutV(m) => write!(f, "mut {}", *m.borrow()),
+            RefV(m) => write!(f, "ref {}", *m),
             PrimV(p) => write!(f, "<prim {}>", p),
             CloV(name, arg, expr, env) => {
                 let name = name.clone().unwrap_or("{anon}".to_string());
                 write!(f, "<fn {} :: {} {}>", name, arg, print_env_safe(env))
             }
-            Null => write!(f, "null"),
+            ObjectV(name, fields) => {
+                let name = name
+                    .clone()
+                    .map(|name| name + " ")
+                    .unwrap_or_else(|| String::new());
+                let fields: String = fields
+                    .iter()
+                    .map(|(k, v)| format!("  {}: {},", k, v))
+                    .fold(String::new(), |acc, pair| format!("{}{}\n", acc, pair));
+                write!(f, "{}{{\n{}}}", name, fields)
+            }
+            EnumV(enum_name, variant, args) => {
+                let mut args = args.clone();
+                let mut args_str = String::new();
+                if args.len() > 0 {
+                    args_str = format!("{}({}", args_str, args.remove(0));
+                    args_str = args
+                        .iter()
+                        .fold(args_str, |acc, arg| format!("{}, {}", acc, arg));
+                    args_str += ")".into();
+                }
+                write!(f, "{}::{}{}", enum_name, variant, args_str)
+            }
+            // StructV(name, fields) => {}
+            NullV => write!(f, "null"),
+            x => write!(f, "{:?}", x),
         }
     }
 }
@@ -88,9 +133,7 @@ pub fn print_env_safe(env: &Rc<Env>) -> String {
     let mut env_str = format!("{{ ");
     for (k, v) in env.iter() {
         match v {
-            Value::CloV(_, arg, _, _) => {
-                env_str = format!("{}{}: <fn {}>, ", env_str, k, arg)
-            },
+            Value::CloV(_, arg, _, _) => env_str = format!("{}{}: <fn {}>, ", env_str, k, arg),
             _ => env_str = format!("{}: {}, ", k, v),
         }
     }

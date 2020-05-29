@@ -1,5 +1,5 @@
-prim print :: x
-fn main :: _ =>
-  let x = 1
-  in print x;
-  x
+fn main :: x =>
+  let x = 1 in (
+    print x;
+    x
+  )

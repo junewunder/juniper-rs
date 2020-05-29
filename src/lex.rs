@@ -112,6 +112,8 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("in"),
                 tag("fn"),
                 tag("prim"),
+                tag("struct"),
+                tag("enum"),
             )),
             |x: &str| Token::Keywd(x.into()),
         ),
@@ -132,11 +134,21 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("-"),
                 tag("*"),
                 tag("/"),
+                tag("."),
             )),
             |x: &str| Token::Op(x.into()),
         ),
         map(
-            alt((tag("::"), tag("("), tag(")"), tag(";"), tag(":"), tag(","))),
+            alt((
+                tag("::"),
+                tag("("),
+                tag(")"),
+                tag(";"),
+                tag(":"),
+                tag(","),
+                tag("{"),
+                tag("}"),
+            )),
             |x: &str| Token::Delim(x.into()),
         ),
     );
@@ -193,6 +205,33 @@ pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
 
     let e: ErrorKind = ErrorKind::TakeTill1;
     Err(Err::Error(ParseError::from_error_kind(input, e)))
+}
+
+pub fn match_next<I, O, F>(matches: F) -> impl Fn(Vec<I>) -> IResult<Vec<I>, O>
+where
+    F: Fn(I) -> Option<O>,
+    I: Clone + 'static,
+{
+    move |input: Vec<I>| {
+        let mut input = input.clone();
+        let err = |input| {
+            Err(Err::Error(ParseError::from_error_kind(
+                input,
+                ErrorKind::TakeTill1,
+            )))
+        };
+
+        if input.len() == 0 {
+            return err(input);
+        };
+
+        let first = input.remove(0);
+        if let Some(out) = matches(first) {
+            return Ok((input, out));
+        };
+
+        err(input)
+    }
 }
 
 /// token tag

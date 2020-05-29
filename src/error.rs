@@ -18,6 +18,9 @@ pub enum InterpErrorKind {
     TypeError,
     UndefinedError(String),
     DerefError(Value),
+    MissingFieldError(String),
+    ExtraFieldError(String),
+    UnimplementedBehavior,
 }
 
 impl fmt::Display for InterpError {
@@ -28,7 +31,7 @@ impl fmt::Display for InterpError {
             TypeError => format!("Type Error"),
             UndefinedError(name) => format!("Undefined variable \"{}\"", name),
             DerefError(value) => format!("Value cannot be dereferenced \"{}\"", value),
-            x => format!("some error {:?}", x),
+            x => format!("{:?}", x),
         };
 
         match self.loc.clone() {
@@ -74,5 +77,9 @@ fn calc_line(err: &InterpError, contents: &String) -> usize {
 fn display_from_file(contents: &String, idx: usize, len: usize) -> String {
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
+    // TODO: This doesn't fix display from file problem for some reason
+    // let start = idx.min(contents.len() - 1);
+    // let end = (idx + len).min(contents.len() - 1);
+    // let contents = &contents[start..end];
     String::from_utf8(contents.to_owned()).expect("Unable to read file to UTF8 format")
 }
