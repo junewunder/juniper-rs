@@ -35,6 +35,7 @@ lazy_static! {
     pub static ref T_LT: Token             = Op("<".into());
     pub static ref T_GT: Token             = Op(">".into());
     pub static ref T_DOT: Token            = Op(".".into());
+    pub static ref T_DOLLAR: Token         = Op("$".into());
     pub static ref T_COLONCOLON: Token     = Delim("::".into());
     pub static ref T_COLON: Token          = Delim(":".into());
     pub static ref T_SEMICOLON: Token      = Delim(";".into());

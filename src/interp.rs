@@ -216,6 +216,13 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]),
             _ => err!(TypeError),
         },
+        AppOpE(f, param) => match (interp(f, env)?, interp(param, env)?) {
+            (CloV(_, arg, body, mut local_env), arg_v) => {
+                interp(body, &local_env.update(arg, arg_v))
+            }
+            (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]),
+            _ => err!(TypeError),
+        },
         AppPrimE(f, xs) => {
             interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
         }

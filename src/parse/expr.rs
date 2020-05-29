@@ -27,7 +27,7 @@ use nom::{
 use std::collections::HashMap;
 use std::rc::Rc;
 
-const P_SEMI: usize = 5;
+const P_SEMI: usize = 0;
 const P_LAM: usize = 10;
 const P_COMMA: usize = 20; // todo
 const P_LET: usize = 30;
@@ -40,6 +40,7 @@ const P_PROD: usize = 160;
 const P_NEG: usize = 170;
 const P_POW: usize = 180; // todo
 const P_FAC: usize = 190; // todo
+const P_APP_OP: usize = 195;
 const P_APP: usize = 200; // todo
 const P_DEREF: usize = 210;
 const P_ACCESS: usize = 220;
@@ -76,6 +77,10 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
             let (input, _) = ttag(&T_SEMICOLON)(input)?;
             Ok((input, box |lhs| lhs))
         }
+    });
+
+    new_op!(P_APP_OP {
+        infix_r: anno_infix_parser(p_app_op)
     });
 
     new_op!(P_LAM {
@@ -319,6 +324,7 @@ binop!(p_lt, T_LT, LtE);
 binop!(p_gt, T_GT, GtE);
 binop!(p_or, T_OR, OrE);
 binop!(p_and, T_AND, AndE);
+binop!(p_app_op, T_DOLLAR, AppOpE);
 unop!(p_neg, T_SUB, NegE);
 unop!(p_deref, T_MULT, DerefE);
 

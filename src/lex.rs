@@ -135,6 +135,7 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("*"),
                 tag("/"),
                 tag("."),
+                tag("$"),
             )),
             |x: &str| Token::Op(x.into()),
         ),

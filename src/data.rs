@@ -42,6 +42,7 @@ pub enum Expr {
     AppPrimE(String, Vec<String>),
 
     SeqE(Wrap<Expr>, Wrap<Expr>),
+    AppOpE(Wrap<Expr>, Wrap<Expr>),
 
     NewE(Wrap<Expr>, Vec<(String, Wrap<Expr>)>),
     AccessE(Wrap<Expr>, String),
