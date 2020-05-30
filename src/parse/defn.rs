@@ -93,7 +93,6 @@ fn p_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>
         let (input, _) = ttag(&T_OP_PAREN)(input)?;
         let (input, variants) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
         let (input, _) = opt(ttag(&T_COMMA))(input)?;
-        let (input, _) = opt(ttag(&T_COMMA))(input)?;
         let (input, _) = ttag(&T_CL_PAREN)(input)?;
         Ok((input, variants))
     })(input)?;

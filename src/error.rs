@@ -20,6 +20,7 @@ pub enum InterpErrorKind {
     DerefError(Value),
     MissingFieldError(String),
     ExtraFieldError(String),
+    NoMatchError(Value),
     UnimplementedBehavior,
 }
 
@@ -38,12 +39,13 @@ impl fmt::Display for InterpError {
             Some(loc) => {
                 let contents = fs::read_to_string(loc.as_str())
                     .expect(&format!("Unable to read file \"{}\"", loc));
-                let snippet = display_from_file(&contents, self.idx, self.len);
+                let line = calc_line(&self, &contents);
+                let snippet = display_from_file(&contents, self.idx, self.len, line);
                 write!(
                     f,
-                    "{} at line {}\n\t{}",
+                    "{} at line {}\n{}",
                     err_msg,
-                    calc_line(&self, &contents),
+                    line,
                     snippet
                 )
             }
@@ -74,12 +76,22 @@ fn calc_line(err: &InterpError, contents: &String) -> usize {
     line_num
 }
 
-fn display_from_file(contents: &String, idx: usize, len: usize) -> String {
+fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize) -> String {
+    let mut line_num = line_num - 1;
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
+    let contents = String::from_utf8(contents.to_owned()).expect("Unable to read file to UTF8 format");
+    let contents = contents.lines()
+        .map(|line| {
+            line_num += 1;
+            format!("{:?}.\t{}\n", line_num, line)
+        })
+        .collect::<String>()
+        .trim_end_matches('\n')
+        .to_owned();
     // TODO: This doesn't fix display from file problem for some reason
     // let start = idx.min(contents.len() - 1);
     // let end = (idx + len).min(contents.len() - 1);
     // let contents = &contents[start..end];
-    String::from_utf8(contents.to_owned()).expect("Unable to read file to UTF8 format")
+    contents
 }

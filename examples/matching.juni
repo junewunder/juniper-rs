@@ -1,0 +1,39 @@
+enum Option {
+  Some(value),
+  None
+}
+
+enum Result {
+  Ok(result),
+  Err(error)
+}
+
+fn give_this_back :: x => (
+  if (random x) > 0.5 then
+    Some x
+  else None
+)
+
+fn make_this_work :: x => (
+  if (random x) > 0.5 then
+    Ok x
+  else Err "oops! it didn't work :("
+)
+
+fn main :: x => (
+  print (match None {
+    Some(x) => "hmm",
+    None => "yup!!",
+  });
+  let test_value = 42 in (
+    print ("test_value = " + test_value);
+    print (match give_this_back test_value {
+      Some(x) => x,
+      None => "oh no, you didn't give it back :(",
+    });
+    print (match make_this_work test_value {
+      Ok(x) => x,
+      Err(e) => ("Q: why didn't it work? A: " + e),
+    });
+  )
+)

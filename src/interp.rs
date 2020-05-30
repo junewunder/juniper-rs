@@ -12,6 +12,7 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     let mut env: Env = vec![
         ("delay".into(), Value::PrimV("delay".into())),
         ("print".into(), Value::PrimV("print".into())),
+        ("random".into(), Value::PrimV("random".into())),
     ]
     .into_iter()
     .collect();
@@ -161,6 +162,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             _ => err!(TypeError),
         },
         StringE(s) => Ok(Value::StringV(s)),
+        NullE => Ok(NullV),
         VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
             kind: UndefinedError(x),
             idx: err_idx,
@@ -281,9 +283,40 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
 
             Ok(RefV(v))
         }
+        MatchE(subject, patterns) => {
+            use MatchPattern::*;
+            // TODO: implement a recursive version of this as a separate function
+            let subject = interp(subject, env)?;
+            for (pattern, body) in patterns.iter() {
+                match (&subject, pattern) {
+                    (EnumV(enum_name, variant, vs), VariantPat(variant_exp, xs))
+                        if xs.len() == vs.len() =>
+                    {
+                        if variant == variant_exp {
+                            let extension: HashMap<_, _> = xs.iter()
+                                .zip(vs)
+                                .map(|(x,v)| (x.clone(), v.clone()))
+                                .collect();
+                            let extended_env: Env = env.clone().union(extension);
+                            return interp(body.clone(), &extended_env);
+                        }
+                    }
+                    (value, EmptyPat(name)) => {
+                        return interp(body.clone(), &env.update(name.clone(), value.clone()));
+                    }
+                    _ => continue
+                };
+            }
+
+            err!(NoMatchError(subject))
+        }
         _ => err!(UnimplementedBehavior),
     }
 }
+
+// fn match_subject(...) -> Value???? {
+//
+// }
 
 fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
     use InterpErrorKind::*;
@@ -291,7 +324,10 @@ fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
     match name.as_str() {
         "print" => {
             if let Some(v) = values.first() {
-                println!("{}", v);
+                match v {
+                    StringV(s) => println!("{}", s),
+                    _ => println!("{}", v)
+                }
             } else {
                 println!("None");
             }
@@ -307,6 +343,13 @@ fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
                 Ok(PrimV("delay".into()))
             }
         }
+        "random" => {
+            Ok(NumV(rand::random()))
+        }
         _ => panic!("no primitive named: {:?}", name),
     }
+}
+
+extern "C" {
+  fn srand() -> u32;
 }

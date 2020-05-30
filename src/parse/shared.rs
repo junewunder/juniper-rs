@@ -1,11 +1,17 @@
 use crate::annotate::Annotated;
 use crate::data::*;
 use crate::lex::{
+    take_ident,
+    ttag,
     Token::{self, *},
     TokenBuffer,
 };
 use crate::mixfix::mixfix::{BinOp, UnOp};
-use nom::IResult;
+use nom::{
+    IResult,
+    combinator::opt,
+    multi::separated_list,
+};
 
 #[rustfmt::skip]
 lazy_static! {
@@ -22,6 +28,7 @@ lazy_static! {
     pub static ref T_PRIM: Token           = Keywd("prim".into());
     pub static ref T_STRUCT: Token         = Keywd("struct".into());
     pub static ref T_ENUM: Token           = Keywd("enum".into());
+    pub static ref T_MATCH: Token          = Keywd("match".into());
     pub static ref T_EQ: Token             = Op("=".into());
     pub static ref T_FAT_ARROW_R: Token    = Op("=>".into());
     pub static ref T_ADD: Token            = Op("+".into());

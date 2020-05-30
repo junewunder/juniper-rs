@@ -16,8 +16,9 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 ## features to do:
 
  - match/case analysis
+ - modules
+ - top level constants -> create BlockV which is closure but without arguments
  - error reporting on parsing
- - top level constants
  - REPL functionality
  - custom parser error type
  - parse values from command line to main function

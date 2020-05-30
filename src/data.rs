@@ -33,6 +33,7 @@ pub enum Expr {
     IfE(Wrap<Expr>, Wrap<Expr>, Wrap<Expr>),
 
     StringE(String),
+    NullE,
 
     VarE(String),
     LetE(String, Wrap<Expr>, Wrap<Expr>),
@@ -54,6 +55,14 @@ pub enum Expr {
     InitStructE(String, HashMap<String, Wrap<Expr>>),
     InitObjectE(Vec<(String, Wrap<Expr>)>),
     InitEnumVariantE(String, String, Vec<String>),
+
+    MatchE(Wrap<Expr>, Vec<(MatchPattern, Wrap<Expr>)>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MatchPattern {
+    VariantPat(String, Vec<String>), // TODO: Vec<VariantPat>
+    EmptyPat(String)
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -122,7 +131,6 @@ impl Display for Value {
                 }
                 write!(f, "{}::{}{}", enum_name, variant, args_str)
             }
-            // StructV(name, fields) => {}
             NullV => write!(f, "null"),
             x => write!(f, "{:?}", x),
         }

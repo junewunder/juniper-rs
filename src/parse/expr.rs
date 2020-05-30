@@ -74,7 +74,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
         infix_l: anno_infix_parser(p_seq)
         postfix: |input| {
             let (input, _) = ttag(&T_SEMICOLON)(input)?;
-            Ok((input, box |lhs| lhs))
+            Ok((input, box |lhs| box Annotated::zero(SeqE(lhs, box Annotated::zero(NullE)))))
         }
     });
 
@@ -163,6 +163,7 @@ fn p_terminals(input: TokenBuffer) -> ExprIResult {
         p_parens,
         p_init_object,
         p_init_struct,
+        p_match,
         p_var,
     ))(input)
 }
@@ -216,6 +217,46 @@ fn p_init_object(input: TokenBuffer) -> ExprIResult {
 
     Ok((input, InitObjectE(fields)))
 }
+
+use crate::data::MatchPattern;
+pub fn p_match(input: TokenBuffer) -> ExprIResult {
+    let (input, _) = ttag(&T_MATCH)(input)?;
+    let (input, subject) = p_expr(input)?;
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
+    let (input, cases) = separated_nonempty_list(ttag(&T_COMMA), p_match_case)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
+    Ok((input, MatchE(subject, cases)))
+}
+
+// TODO: nested patterns
+fn p_match_case(input: TokenBuffer) -> IResult<TokenBuffer, (MatchPattern, Box<Annotated<Expr>>)> {
+    use MatchPattern::*;
+    let (input, pattern) = alt((
+        map(p_match_enum_field, |(variant, args)| VariantPat(variant, args)),
+        map(take_ident, |x| EmptyPat(x))
+        // map(p_string, |x| StringPat(x))
+        // map(p_num, |x| NumPat(x))
+    ))(input)?;
+    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
+    let (input, body) = p_expr(input)?;
+
+    Ok((input, (pattern, body)))
+}
+
+fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>)> {
+    let (input, name) = take_ident(input)?;
+    let (input, variants) = opt(|input| {
+        let (input, _) = ttag(&T_OP_PAREN)(input)?;
+        let (input, variants) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
+        let (input, _) = opt(ttag(&T_COMMA))(input)?;
+        let (input, _) = ttag(&T_CL_PAREN)(input)?;
+        Ok((input, variants))
+    })(input)?;
+
+    Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
+}
+
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
     Ok((input, box move |lhs, rhs| AppE(lhs, rhs)))
