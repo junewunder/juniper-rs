@@ -41,13 +41,7 @@ impl fmt::Display for InterpError {
                     .expect(&format!("Unable to read file \"{}\"", loc));
                 let line = calc_line(&self, &contents);
                 let snippet = display_from_file(&contents, self.idx, self.len, line);
-                write!(
-                    f,
-                    "{} at line {}\n{}",
-                    err_msg,
-                    line,
-                    snippet
-                )
+                write!(f, "{} at line {}\n{}", err_msg, line, snippet)
             }
             None => write!(f, "{} in <unknown file>", err_msg),
         }
@@ -80,8 +74,10 @@ fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize)
     let mut line_num = line_num - 1;
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
-    let contents = String::from_utf8(contents.to_owned()).expect("Unable to read file to UTF8 format");
-    let contents = contents.lines()
+    let contents =
+        String::from_utf8(contents.to_owned()).expect("Unable to read file to UTF8 format");
+    let contents = contents
+        .lines()
         .map(|line| {
             line_num += 1;
             format!("{:?}.\t{}\n", line_num, line)

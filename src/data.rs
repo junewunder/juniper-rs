@@ -61,8 +61,10 @@ pub enum Expr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum MatchPattern {
-    VariantPat(String, Vec<String>), // TODO: Vec<VariantPat>
-    EmptyPat(String)
+    VariantPat(String, Vec<MatchPattern>),
+    AnyPat(String),
+    StringPat(String),
+    NumPat(f64),
 }
 
 #[derive(PartialEq, Debug, Clone)]

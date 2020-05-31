@@ -31,6 +31,7 @@ const P_SEMI: usize = 5;
 const P_LAM: usize = 10;
 const P_COMMA: usize = 20; // todo
 const P_LET: usize = 30;
+const P_DEREF: usize = 35;
 const P_ARR: usize = 40; // todo
 const P_OR: usize = 50;
 const P_AND: usize = 60;
@@ -41,8 +42,7 @@ const P_NEG: usize = 170;
 const P_POW: usize = 180; // todo
 const P_FAC: usize = 190; // todo
 const P_APP: usize = 200; // todo
-const P_DEREF: usize = 210;
-const P_ACCESS: usize = 220;
+const P_ACCESS: usize = 210;
 
 fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<Annotated<Expr>> {
     let idx = tokbuf_before.first().unwrap().idx;
@@ -55,6 +55,7 @@ fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<A
     }
 }
 
+#[rustfmt::skip]
 fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
     let mut levels: HashMap<usize, Rc<Mixes<TokenBuffer, Box<Annotated<Expr>>>>> = HashMap::new();
 
@@ -78,49 +79,27 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
         }
     });
 
-    new_op!(P_LAM {
-        prefix: anno_prefix_parser(alt((p_func_named, p_func_anon)))
-    });
+    new_op!(P_LAM { prefix: anno_prefix_parser(alt((p_func_named, p_func_anon))) });
 
-    new_op!(P_LET {
-        prefix: anno_prefix_parser(alt((p_let, p_if, p_while, p_mutable, p_mutate,)))
-    });
+    new_op!(P_LET { prefix: anno_prefix_parser(alt((p_let, p_if, p_while, p_mutable, p_mutate))) });
 
-    new_op!(P_OR {
-        infix_l: anno_infix_parser(p_or)
-    });
+    new_op!(P_DEREF { prefix: anno_prefix_parser(p_deref) });
 
-    new_op!(P_AND {
-        infix_l: anno_infix_parser(p_and)
-    });
+    new_op!(P_OR { infix_l: anno_infix_parser(p_or) });
 
-    new_op!(P_CMP {
-        infix: anno_infix_parser(alt((p_eq, p_lt, p_gt)))
-    });
+    new_op!(P_AND { infix_l: anno_infix_parser(p_and) });
 
-    new_op!(P_SUM {
-        infix_l: anno_infix_parser(alt((p_add, p_sub)))
-    });
+    new_op!(P_CMP { infix: anno_infix_parser(alt((p_eq, p_lt, p_gt))) });
 
-    new_op!(P_PROD {
-        infix_l: anno_infix_parser(alt((p_mult, p_div)))
-    });
+    new_op!(P_SUM { infix_l: anno_infix_parser(alt((p_add, p_sub))) });
 
-    new_op!(P_NEG {
-        prefix: anno_prefix_parser(p_neg)
-    });
+    new_op!(P_PROD { infix_l: anno_infix_parser(alt((p_mult, p_div))) });
 
-    new_op!(P_APP {
-        infix_l: anno_infix_parser(p_app)
-    });
+    new_op!(P_NEG { prefix: anno_prefix_parser(p_neg) });
 
-    new_op!(P_DEREF {
-        prefix: anno_prefix_parser(p_deref)
-    });
+    new_op!(P_APP { infix_l: anno_infix_parser(p_app) });
 
-    new_op!(P_ACCESS {
-        postfix: anno_postfix_parser(p_access)
-    });
+    new_op!(P_ACCESS { postfix: anno_postfix_parser(p_access) });
 
     MixfixParser {
         terminals: Rc::new(box annotated_terminal(box p_terminals)),
@@ -231,24 +210,43 @@ pub fn p_match(input: TokenBuffer) -> ExprIResult {
 
 // TODO: nested patterns
 fn p_match_case(input: TokenBuffer) -> IResult<TokenBuffer, (MatchPattern, Box<Annotated<Expr>>)> {
-    use MatchPattern::*;
-    let (input, pattern) = alt((
-        map(p_match_enum_field, |(variant, args)| VariantPat(variant, args)),
-        map(take_ident, |x| EmptyPat(x))
-        // map(p_string, |x| StringPat(x))
-        // map(p_num, |x| NumPat(x))
-    ))(input)?;
+    let (input, pattern) = p_match_pattern(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     let (input, body) = p_expr(input)?;
 
     Ok((input, (pattern, body)))
 }
 
-fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>)> {
+fn p_match_pattern(input: TokenBuffer) -> IResult<TokenBuffer, MatchPattern> {
+    use MatchPattern::*;
+    alt((
+        map(p_match_enum_field, |(variant, args)| {
+            VariantPat(variant, args)
+        }),
+        map(take_ident, |x| AnyPat(x)),
+        map(p_string, |x| {
+            if let Expr::StringE(s) = x {
+                StringPat(s)
+            } else {
+                panic!()
+            }
+        }),
+        map(p_num, |x| {
+            if let Expr::NumE(n) = x {
+                NumPat(n)
+            } else {
+                panic!()
+            }
+        }),
+    ))(input)
+}
+
+fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
+    let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, name) = take_ident(input)?;
     let (input, variants) = opt(|input| {
         let (input, _) = ttag(&T_OP_PAREN)(input)?;
-        let (input, variants) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
+        let (input, variants) = separated_list(ttag(&T_COMMA), p_match_pattern)(input)?;
         let (input, _) = opt(ttag(&T_COMMA))(input)?;
         let (input, _) = ttag(&T_CL_PAREN)(input)?;
         Ok((input, variants))
@@ -256,7 +254,6 @@ fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<S
 
     Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
 }
-
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
     Ok((input, box move |lhs, rhs| AppE(lhs, rhs)))

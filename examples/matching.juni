@@ -21,19 +21,35 @@ fn make_this_work :: x => (
 )
 
 fn main :: x => (
-  print (match None {
-    Some(x) => "hmm",
-    None => "yup!!",
-  });
   let test_value = 42 in (
+
     print ("test_value = " + test_value);
-    print (match give_this_back test_value {
-      Some(x) => x,
-      None => "oh no, you didn't give it back :(",
-    });
-    print (match make_this_work test_value {
-      Ok(x) => x,
-      Err(e) => ("Q: why didn't it work? A: " + e),
-    });
+    print "";
+
+    match give_this_back test_value {
+      ::Some(x) => print ("thanks for giving me back " + x),
+      ::None => print "oh no, you didn't give it back :(",
+    };
+    print "";
+
+    match make_this_work test_value {
+      ::Ok(x) => print ("yay, " + x + " worked!"),
+      ::Err(e) => print ("Q: why didn't it work? A: " + e),
+    };
+    print "";
+
+    let r_num = (round ((random 1) * 10)) in (
+      print ("r_num = " + r_num);
+      match r_num {
+        0 => print "zero'th?",
+        1 => print "first",
+        2 => print "second",
+        3 => print "third",
+        4 => print "fourth",
+        5 => print "fifth",
+        x => print ("" + x + ", too many to count")
+      };
+      print "";
+    )
   )
 )

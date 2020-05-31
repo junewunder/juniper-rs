@@ -1,17 +1,12 @@
 use crate::annotate::Annotated;
 use crate::data::*;
 use crate::lex::{
-    take_ident,
-    ttag,
+    take_ident, ttag,
     Token::{self, *},
     TokenBuffer,
 };
 use crate::mixfix::mixfix::{BinOp, UnOp};
-use nom::{
-    IResult,
-    combinator::opt,
-    multi::separated_list,
-};
+use nom::{combinator::opt, multi::separated_list, IResult};
 
 #[rustfmt::skip]
 lazy_static! {
