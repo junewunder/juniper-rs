@@ -114,6 +114,7 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("prim"),
                 tag("struct"),
                 tag("enum"),
+                tag("match"),
             )),
             |x: &str| Token::Keywd(x.into()),
         ),
