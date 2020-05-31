@@ -4,10 +4,25 @@ use std::fmt::{self, Formatter};
 use std::fs;
 use std::io::{self, Write};
 use std::str;
+use nom::error::{
+    ErrorKind as NomErrorKind,
+    ParseError as NomParseError,
+};
+
+// #[derive(Debug, Clone)]
+// pub struct InterpError {
+//     pub kind: InterpErrorKind,
+//     pub idx: usize,
+//     pub len: usize,
+//     pub loc: Option<String>,
+// }
+
+pub type InterpError = AnnotatedError<InterpErrorKind>;
+pub type ParseError = AnnotatedError<ParseErrorKind>;
 
 #[derive(Debug, Clone)]
-pub struct InterpError {
-    pub kind: InterpErrorKind,
+pub struct AnnotatedError<ErrorKind> {
+    pub kind: ErrorKind,
     pub idx: usize,
     pub len: usize,
     pub loc: Option<String>,
@@ -55,7 +70,65 @@ impl error::Error for InterpError {
     }
 }
 
-fn calc_line(err: &InterpError, contents: &String) -> usize {
+#[derive(Debug, Clone)]
+pub enum ParseErrorKind {
+    NomError(NomErrorKind),
+    GenericError
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use ParseErrorKind::*;
+
+        let err_msg: String = match self.kind.clone() {
+            ParseErrorKind::NomError(e) => format!("nom error: {:?}", e),
+            ParseErrorKind::GenericError => format!("generic error"),
+            x => format!("{:?}", x),
+        };
+
+        match self.loc.clone() {
+            Some(loc) => {
+                let contents = fs::read_to_string(loc.as_str())
+                    .expect(&format!("Unable to read file \"{}\"", loc));
+                let line = calc_line(&self, &contents);
+                let snippet = display_from_file(&contents, self.idx, self.len, line);
+                write!(f, "{} at line {}\n{}", err_msg, line, snippet)
+            }
+            None => write!(f, "{} in <unknown file>", err_msg),
+        }
+    }
+}
+
+impl error::Error for ParseError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        // Generic error, underlying cause isn't tracked.
+        None
+    }
+}
+
+// impl Into<ParseError> for (crate::lex::TokenBuffer, NomErrorKind) {
+//     fn into(self) -> ParseError {
+//         AnnotatedError {
+//             kind: ParseErrorKind::NomError(self.1),
+//             idx: self.0.first().map_or(0, |x| x.idx),
+//             len: self.0.last().map_or(0, |x| x.len),
+//             loc: None,
+//         }
+//     }
+// }
+
+impl From<(crate::lex::TokenBuffer, NomErrorKind)> for ParseError {
+    fn from(error: (crate::lex::TokenBuffer, NomErrorKind)) -> Self {
+        AnnotatedError {
+            kind: ParseErrorKind::NomError(error.1),
+            idx: error.0.first().map_or(0, |x| x.idx),
+            len: error.0.last().map_or(0, |x| x.len),
+            loc: None,
+        }
+    }
+}
+
+fn calc_line<T>(err: &AnnotatedError<T>, contents: &String) -> usize {
     let idx_out_of_bounds = format!("Error position out of bounds for file: {:?}", err.loc);
     let lines: Vec<&str> = contents.split('\n').collect();
     let mut curr_pos = 0;

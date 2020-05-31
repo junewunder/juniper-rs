@@ -50,6 +50,26 @@ fn main :: x => (
         x => print ("" + x + ", too many to count")
       };
       print "";
+    );
+
+    match "abc" {
+      "xyz" => print "nope",
+      "abc" => print "yep",
+    };
+    print "";
+
+    let r_num = (round ((random 1) * 10)) in (
+      print ("r_num = " + r_num);
+      match ("r = " + r_num) {
+        "r = 0" => print "r is zero'th?",
+        "r = 1" => print "r is first",
+        "r = 2" => print "r is second",
+        "r = 3" => print "r is third",
+        "r = 4" => print "r is fourth",
+        "r = 5" => print "r is fifth",
+        x => print ("" + x + ", too many to count")
+      };
+      print "";
     )
   )
 )

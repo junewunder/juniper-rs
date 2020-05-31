@@ -290,7 +290,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             let subject = interp(subject, env)?;
             for (pattern, body) in patterns.iter() {
                 if let Some(extension) = match_subject(&subject, pattern) {
-                    let extended_env: Env = env.clone().union(extension);
+                    let extended_env: Env = extension.union(env.clone());
                     return interp_expr(body.clone(), &extended_env);
                 }
             }

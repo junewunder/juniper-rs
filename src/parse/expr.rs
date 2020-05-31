@@ -10,6 +10,7 @@ use crate::mixfix::{
     mixfix::*,
 };
 use crate::parse::shared::*;
+use crate::error::{AnnotatedError, ParseError, ParseErrorKind};
 use core::fmt::Error;
 use nom::{
     self,
@@ -18,7 +19,7 @@ use nom::{
     character::complete::{alpha1, char, space0, space1},
     combinator::map,
     combinator::{complete, not, opt, peek},
-    error::{ErrorKind, ParseError},
+    error::{ErrorKind as NomErrorKind, ParseError as NomParseError},
     multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
@@ -43,17 +44,6 @@ const P_POW: usize = 180; // todo
 const P_FAC: usize = 190; // todo
 const P_APP: usize = 200; // todo
 const P_ACCESS: usize = 210;
-
-fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<Annotated<Expr>> {
-    let idx = tokbuf_before.first().unwrap().idx;
-    let len = tokbuf_after.first().map(|x| idx - x.idx).unwrap();
-
-    box Annotated {
-        tok: expr,
-        idx,
-        len,
-    }
-}
 
 #[rustfmt::skip]
 fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
@@ -150,9 +140,9 @@ fn p_terminals(input: TokenBuffer) -> ExprIResult {
 fn p_var(input: TokenBuffer) -> ExprIResult {
     let (input, x) = take_ident(input)?;
     if peek(ttag(&T_FAT_ARROW_R))(input.clone()).is_ok() {
-        return Err(Err::Error(ParseError::from_error_kind(
+        return Err(Err::Error(NomParseError::from_error_kind(
             input,
-            ErrorKind::Tag,
+            NomErrorKind::Tag,
         )));
     }
     Ok((input, VarE(x)))
@@ -364,30 +354,40 @@ fn p_num(input: TokenBuffer) -> ExprIResult {
     let mut input = input.clone();
 
     if input.len() == 0 {
-        let e: ErrorKind = ErrorKind::Float;
-        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+        let e: NomErrorKind = NomErrorKind::Float;
+        return Err(Err::Error(NomParseError::from_error_kind(input, e)));
     };
 
     if let Num(i) = input.remove(0).tok {
         return Ok((input, NumE(i)));
     };
 
-    let e: ErrorKind = ErrorKind::Float;
-    Err(Err::Error(ParseError::from_error_kind(input, e)))
+    let e: NomErrorKind = NomErrorKind::Float;
+    Err(Err::Error(NomParseError::from_error_kind(input, e)))
 }
 
 fn p_string(input: TokenBuffer) -> ExprIResult {
     let mut input = input.clone();
 
     if input.len() == 0 {
-        let e: ErrorKind = ErrorKind::Tag;
-        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+        let e: NomErrorKind = NomErrorKind::Tag;
+        return Err(Err::Error(NomParseError::from_error_kind(input, e)));
     };
 
     if let Str(string) = input.remove(0).tok {
         return Ok((input, StringE(string)));
     };
 
-    let e: ErrorKind = ErrorKind::Tag;
-    Err(Err::Error(ParseError::from_error_kind(input, e)))
+    // return Err(nom_err(input, ))
+    let e: NomErrorKind = NomErrorKind::Tag;
+    Err(Err::Error(NomParseError::from_error_kind(input, e)))
+}
+
+fn nom_err(input: TokenBuffer, kind: NomErrorKind) -> nom::Err<ParseError> {
+    Err::Error(AnnotatedError {
+        kind: ParseErrorKind::NomError(kind),
+        idx: input.first().map_or(0, |x| x.idx),
+        len: input.last().map_or(0, |x| x.len),
+        loc: None,
+    })
 }
