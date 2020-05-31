@@ -25,16 +25,16 @@ use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>, ParseError> {
-    println!("{:?}", complete(alt((
-        p_fn_named, p_prim, p_struct, p_enum,
-    )))(input.clone()));
-    let (input, defs) = many0(annotated_terminal(complete(alt((
+    // println!("JUST ALT {:?}", alt((
+    //     p_fn_named, p_prim, p_struct, p_enum,
+    // ))(input.clone()));
+    let (input, defs) = complete(many1(annotated_terminal(alt((
         p_fn_named,
-        p_fn_named,
-        // p_struct,
-        // p_enum,
+        p_prim,
+        p_struct,
+        p_enum,
     )))))(input)?;
-    println!("helloooo", );
+    // println!("helloooo", );
     Ok((input, defs))
 }
 
