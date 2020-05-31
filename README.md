@@ -15,10 +15,15 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 
 ## features to do:
 
+ - PARSER ERRORS
+ - error reporting on parsing
+ - error reporting on parsing
+ - error reporting on parsing
+ - PARSER ERRORS
+
  - match/case analysis
  - modules
  - top level constants -> create BlockV which is closure but without arguments
- - error reporting on parsing
  - REPL functionality
  - custom parser error type
  - parse values from command line to main function
