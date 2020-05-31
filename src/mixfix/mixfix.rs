@@ -12,16 +12,16 @@ use std::rc::Rc;
 
 pub trait UnOp<O> = Fn(O) -> O;
 pub trait BinOp<O> = Fn(O, O) -> O;
-pub trait Parser<I, O> = Fn(I) -> IResult<I, O>;
+pub trait Parser<I, O, E=(I,ErrorKind)> = Fn(I) -> IResult<I, O, E>;
 
-fn throw_err_parser<I, O>() -> impl Parser<I, O> {
+fn throw_err_parser<I, O, E: nom::error::ParseError<I>>() -> impl Parser<I, O, E> {
     Box::new(|input| {
         let e: ErrorKind = ErrorKind::NoneOf;
         Err(Err::Error(ParseError::from_error_kind(input, e)))
     })
 }
 
-fn unit<I, O>(output: O) -> impl Parser<I, O>
+fn unit<I, O, E>(output: O) -> impl Parser<I, O, E>
 where
     I: Clone + 'static,
     O: Clone + 'static,
@@ -29,10 +29,10 @@ where
     move |input: I| Ok((input, output.clone()))
 }
 
-fn bind<I, Oa, Ob>(
-    parse_a: Rc<impl Parser<I, Oa> + ?Sized>,
-    binder: impl Fn(Oa) -> Box<dyn Parser<I, Ob>>,
-) -> impl Parser<I, Ob> {
+fn bind<I, Oa, Ob, E>(
+    parse_a: Rc<impl Parser<I, Oa, E> + ?Sized>,
+    binder: impl Fn(Oa) -> Box<dyn Parser<I, Ob, E>>,
+) -> impl Parser<I, Ob, E> {
     move |input: I| {
         let (input, a) = (parse_a)(input)?;
         binder(a)(input)
@@ -48,57 +48,23 @@ pub enum Fixity {
     InfixR,
 }
 
-pub struct Mixes<I, O>
+pub struct Mixes<I, O, E=(I,ErrorKind)>
 where
     I: Clone + 'static,
     O: Clone + 'static,
 {
-    pub prefix: Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>>>>,
-    pub postfix: Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>>>>,
-    pub infix: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
-    pub infix_l: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
-    pub infix_r: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
+    pub prefix: Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>, E>>>,
+    pub postfix: Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>, E>>>,
+    pub infix: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>, E>>>,
+    pub infix_l: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>, E>>>,
+    pub infix_r: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>, E>>>,
 }
 
-// TODO: make this a macro
-impl<I, O> Mixes<I, O>
+impl<I, O, E> Default for Mixes<I, O, E>
 where
     I: Clone + 'static,
     O: Clone + 'static,
-{
-    pub fn new_infix_l(
-        levels: &mut HashMap<usize, Rc<Mixes<I, O>>>,
-        precedence: usize,
-        parser: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
-    ) {
-        levels.insert(
-            precedence,
-            Rc::new(Mixes {
-                infix_l: parser,
-                ..Mixes::default()
-            }),
-        );
-    }
-
-    pub fn new_prefix(
-        levels: &mut HashMap<usize, Rc<Mixes<I, O>>>,
-        precedence: usize,
-        parser: Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>>>>,
-    ) {
-        levels.insert(
-            precedence,
-            Rc::new(Mixes {
-                prefix: parser,
-                ..Mixes::default()
-            }),
-        );
-    }
-}
-
-impl<I, O> Default for Mixes<I, O>
-where
-    I: Clone + 'static,
-    O: Clone + 'static,
+    E: ParseError<I> + 'static
 {
     fn default() -> Self {
         Mixes {
@@ -111,29 +77,31 @@ where
     }
 }
 
-pub struct MixfixParser<I, O>
+pub struct MixfixParser<I, O, E=(I,ErrorKind)>
 where
     I: Clone + 'static,
     O: Clone + 'static,
+    E: ParseError<I> + 'static
 {
-    pub terminals: Rc<Box<dyn Parser<I, O>>>,
-    pub levels: HashMap<usize, Rc<Mixes<I, O>>>,
+    pub terminals: Rc<Box<dyn Parser<I, O, E>>>,
+    pub levels: HashMap<usize, Rc<Mixes<I, O, E>>>,
 }
 
-impl<I, O> MixfixParser<I, O>
+impl<I, O, E> MixfixParser<I, O, E>
 where
     I: Clone + 'static + std::fmt::Debug,
     O: Clone + 'static,
+    E: ParseError<I> + 'static
 {
-    pub fn parse(&self, input: I) -> IResult<I, O> {
+    pub fn parse(&self, input: I) -> IResult<I, O, E> {
         self.mainloop(self.min_level())(input)
     }
 
-    pub fn build_parser(&self) -> Rc<dyn Parser<I, O>> {
+    pub fn build_parser(&self) -> Rc<dyn Parser<I, O, E>> {
         self.mainloop(self.min_level())
     }
 
-    fn mainloop(&self, current: Option<usize>) -> Rc<dyn Parser<I, O>> {
+    fn mainloop(&self, current: Option<usize>) -> Rc<dyn Parser<I, O, E>> {
         match current {
             None => self.terminals_parser(),
             Some(curr) => {
@@ -161,15 +129,15 @@ where
             .cloned()
     }
 
-    fn terminals_parser(&self) -> Rc<dyn Parser<I, O>> {
+    fn terminals_parser(&self) -> Rc<dyn Parser<I, O, E>> {
         let terminals = Rc::clone(&self.terminals);
         Rc::new(move |i: I| terminals(i))
     }
 
     fn build_level_nondirected(
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> Rc<dyn Parser<I, O>> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> Rc<dyn Parser<I, O, E>> {
         Rc::new(bind(next_level.clone(), move |x| {
             box alt((
                 MixfixParser::level_inf_after_one(x.clone(), mixes.clone(), next_level.clone()),
@@ -179,9 +147,9 @@ where
     }
 
     fn build_level_directed(
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> Rc<dyn Parser<I, O>> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> Rc<dyn Parser<I, O, E>> {
         let mixes_c = mixes.clone();
         let next_level_c = next_level.clone();
 
@@ -207,9 +175,9 @@ where
 
     fn level_inf_after_one(
         lhs: O,
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> impl Parser<I, O> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> impl Parser<I, O, E> {
         bind(Rc::clone(&mixes.infix), move |f| {
             let lhs = lhs.clone();
             box bind(next_level.clone(), move |rhs| {
@@ -220,9 +188,9 @@ where
 
     fn level_infl_after_one(
         lhs: O,
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> impl Parser<I, O> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> impl Parser<I, O, E> {
         let next_level_c = next_level.clone();
         let lhs_c = lhs.clone();
         let infixl_or_postfix = alt((
@@ -249,9 +217,9 @@ where
 
     fn level_infr_after_one(
         lhs: O,
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> impl Parser<I, O> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> impl Parser<I, O, E> {
         bind(mixes.infix_r.clone(), move |f| {
             let lhs = lhs.clone();
             box bind(next_level.clone(), move |rhs| {
@@ -260,9 +228,9 @@ where
         })
     }
     fn level_infr(
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> impl Parser<I, O> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> impl Parser<I, O, E> {
         let mixes_c = mixes.clone();
         let next_level_c = next_level.clone();
 
@@ -284,9 +252,9 @@ where
     }
 
     fn level_infr_not_after_one(
-        mixes: Rc<Mixes<I, O>>,
-        next_level: Rc<dyn Parser<I, O> + 'static>,
-    ) -> impl Parser<I, O> {
+        mixes: Rc<Mixes<I, O, E>>,
+        next_level: Rc<dyn Parser<I, O, E> + 'static>,
+    ) -> impl Parser<I, O, E> {
         bind(mixes.prefix.clone(), move |f| {
             let binder = MixfixParser::level_infr(mixes.clone(), next_level.clone());
             box bind(Rc::new(binder), move |rhs| box unit(f(rhs.clone())))

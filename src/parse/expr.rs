@@ -10,6 +10,7 @@ use crate::mixfix::{
     mixfix::*,
 };
 use crate::parse::shared::*;
+use crate::error::{AnnotatedError, ParseError, ParseErrorKind::{self, *}};
 use core::fmt::Error;
 use nom::{
     self,
@@ -55,8 +56,9 @@ fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<A
     }
 }
 
-fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
-    let mut levels: HashMap<usize, Rc<Mixes<TokenBuffer, Box<Annotated<Expr>>>>> = HashMap::new();
+#[rustfmt::skip]
+fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>, ParseError> {
+    let mut levels: HashMap<usize, Rc<Mixes<TokenBuffer, Box<Annotated<Expr>>, ParseError>>> = HashMap::new();
 
     macro_rules! new_op {
         ($precedence:ident { $($kind:ident : $parser:expr)* }) => {
@@ -129,7 +131,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
 }
 
 // TODO: when running multithreaded tests, this is bad. RUST_TEST_THREADS=1
-static mut P_EXPR_VALUE: Option<Rc<dyn Parser<TokenBuffer, Box<Annotated<Expr>>>>> = None;
+static mut P_EXPR_VALUE: Option<Rc<dyn Parser<TokenBuffer, Box<Annotated<Expr>>, ParseError>>> = None;
 
 pub fn init_p_expr() {
     unsafe {
@@ -142,7 +144,7 @@ pub fn init_p_expr() {
     }
 }
 
-pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> {
+pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>, ParseError> {
     unsafe {
         if P_EXPR_VALUE.is_none() {
             init_p_expr();
@@ -191,7 +193,7 @@ fn p_parens(input: TokenBuffer) -> ExprIResult {
     Ok((input, (*e).unwrap()))
 }
 
-fn p_string_expr_pair(input: TokenBuffer) -> IResult<TokenBuffer, (String, Box<Annotated<Expr>>)> {
+fn p_string_expr_pair(input: TokenBuffer) -> IResult<TokenBuffer, (String, Box<Annotated<Expr>>), ParseError> {
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLON)(input)?;
     let (input, value) = p_expr(input)?;
@@ -215,6 +217,64 @@ fn p_init_object(input: TokenBuffer) -> ExprIResult {
     let (input, _) = ttag(&T_CL_BRACE)(input)?;
 
     Ok((input, InitObjectE(fields)))
+}
+
+use crate::data::MatchPattern;
+pub fn p_match(input: TokenBuffer) -> ExprIResult {
+    let (input, _) = ttag(&T_MATCH)(input)?;
+    let (input, subject) = p_expr(input)?;
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
+    let (input, cases) = separated_nonempty_list(ttag(&T_COMMA), p_match_case)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
+    Ok((input, MatchE(subject, cases)))
+}
+
+// TODO: nested patterns
+fn p_match_case(input: TokenBuffer) -> IResult<TokenBuffer, (MatchPattern, Box<Annotated<Expr>>), ParseError> {
+    let (input, pattern) = p_match_pattern(input)?;
+    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
+    let (input, body) = p_expr(input)?;
+
+    Ok((input, (pattern, body)))
+}
+
+fn p_match_pattern(input: TokenBuffer) -> IResult<TokenBuffer, MatchPattern, ParseError> {
+    use MatchPattern::*;
+    alt((
+        map(p_match_enum_field, |(variant, args)| {
+            VariantPat(variant, args)
+        }),
+        map(take_ident, |x| AnyPat(x)),
+        map(p_string, |x| {
+            if let Expr::StringE(s) = x {
+                StringPat(s)
+            } else {
+                panic!()
+            }
+        }),
+        map(p_num, |x| {
+            if let Expr::NumE(n) = x {
+                NumPat(n)
+            } else {
+                panic!()
+            }
+        }),
+    ))(input)
+}
+
+fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>), ParseError> {
+    let (input, _) = ttag(&T_COLONCOLON)(input)?;
+    let (input, name) = take_ident(input)?;
+    let (input, variants) = opt(|input| {
+        let (input, _) = ttag(&T_OP_PAREN)(input)?;
+        let (input, variants) = separated_list(ttag(&T_COMMA), p_match_pattern)(input)?;
+        let (input, _) = opt(ttag(&T_COMMA))(input)?;
+        let (input, _) = ttag(&T_CL_PAREN)(input)?;
+        Ok((input, variants))
+    })(input)?;
+
+    Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
 }
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
@@ -309,6 +369,11 @@ macro_rules! binop {
     };
 }
 
+// pub fn p_seq(input: TokenBuffer) -> BinOpIResult {
+//     let (input, _) = ttag(&T_SEMICOLON)(input)?;
+//     Ok((input, box |lhs, rhs| SeqE(lhs, rhs)))
+// }
+
 binop!(p_seq, T_SEMICOLON, SeqE);
 binop!(p_add, T_ADD, PlusE);
 binop!(p_sub, T_SUB, MinusE);
@@ -326,30 +391,37 @@ fn p_num(input: TokenBuffer) -> ExprIResult {
     let mut input = input.clone();
 
     if input.len() == 0 {
-        let e: ErrorKind = ErrorKind::Float;
-        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+        let e: NomErrorKind = NomErrorKind::Float;
+        return Err(Err::Error((input, TakeNumberError).into()));
     };
 
     if let Num(i) = input.remove(0).tok {
         return Ok((input, NumE(i)));
     };
 
-    let e: ErrorKind = ErrorKind::Float;
-    Err(Err::Error(ParseError::from_error_kind(input, e)))
+    let e: NomErrorKind = NomErrorKind::Float;
+    Err(Err::Error((input, TakeNumberError).into()))
 }
 
 fn p_string(input: TokenBuffer) -> ExprIResult {
     let mut input = input.clone();
 
     if input.len() == 0 {
-        let e: ErrorKind = ErrorKind::Tag;
-        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+        return Err(Err::Error((input, TakeStringError).into()));
     };
 
     if let Str(string) = input.remove(0).tok {
         return Ok((input, StringE(string)));
     };
 
-    let e: ErrorKind = ErrorKind::Tag;
-    Err(Err::Error(ParseError::from_error_kind(input, e)))
+    Err(Err::Error((input, TakeStringError).into()))
 }
+
+// fn nom_err(input: TokenBuffer, kind: NomErrorKind) -> nom::Err<ParseError> {
+//     Err::Error(AnnotatedError {
+//         kind: ParseErrorKind::NomError(kind),
+//         idx: input.first().map_or(0, |x| x.idx),
+//         len: input.last().map_or(0, |x| x.len),
+//         loc: None,
+//     })
+// }

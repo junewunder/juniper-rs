@@ -1,0 +1,38 @@
+enum Nat {
+  Suc(n),
+  Zero,
+}
+
+fn is_even :: n => match n {
+  ::Zero => true,
+  ::Suc(::Zero) => false,
+  ::Suc(::Suc(n)) => is_even(n),
+}
+
+fn is_odd :: n => match n {
+  ::Zero => false,
+  ::Suc(::Zero) => true,
+  ::Suc(::Suc(n)) => is_odd(n),
+}
+
+fn to_nat :: n => (
+  if n > 0 then
+    Suc (to_nat (n - 1))
+  else
+    Zero
+)
+
+fn main :: x => (
+  mut i = 0 in
+  while (*i) < 10 => (
+    let n = to_nat (*i) in
+    print (
+      "" + (*i) + (
+        if is_even (to_nat (*i)) then " is even"
+        else if (is_odd (to_nat (*i))) then " is odd"
+        else " lmao wtf WHAT"
+      )
+    );
+    !i = (*i) + 1;
+  )
+)

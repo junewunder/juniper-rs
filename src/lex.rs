@@ -1,4 +1,5 @@
 use crate::annotate::Annotated;
+use crate::error::{AnnotatedError, ParseError, ParseErrorKind::{self, *}};
 use core::iter::Enumerate;
 use core::iter::Map;
 use core::slice::Iter;
@@ -10,7 +11,10 @@ use nom::combinator::map;
 use nom::combinator::not;
 use nom::combinator::opt;
 use nom::combinator::value;
-use nom::error::{ErrorKind, ParseError};
+use nom::error::{
+    ErrorKind as NomErrorKind,
+    ParseError as NomParseError
+};
 use nom::number::complete::double;
 use nom::Err;
 use nom::InputIter;
@@ -191,57 +195,55 @@ pub fn p_ident(input: &str) -> IResult<&str, Token> {
     Ok((input, Token::Ident(x.join("").to_string())))
 }
 
-pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
+pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String, ParseError> {
     let mut t = input.clone();
 
     if input.len() == 0 {
-        let e: ErrorKind = ErrorKind::TakeTill1;
-        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+        return Err(Err::Error((input, TakeIdentError).into()));
     };
 
     if let Token::Ident(ident) = t.remove(0).tok {
         return Ok((t, ident.clone()));
     };
 
-    let e: ErrorKind = ErrorKind::TakeTill1;
-    Err(Err::Error(ParseError::from_error_kind(input, e)))
+    Err(Err::Error((input, TakeIdentError).into()))
 }
 
-pub fn match_next<I, O, F>(matches: F) -> impl Fn(Vec<I>) -> IResult<Vec<I>, O>
-where
-    F: Fn(I) -> Option<O>,
-    I: Clone + 'static,
-{
-    move |input: Vec<I>| {
-        let mut input = input.clone();
-        let err = |input| {
-            Err(Err::Error(ParseError::from_error_kind(
-                input,
-                ErrorKind::TakeTill1,
-            )))
-        };
-
-        if input.len() == 0 {
-            return err(input);
-        };
-
-        let first = input.remove(0);
-        if let Some(out) = matches(first) {
-            return Ok((input, out));
-        };
-
-        err(input)
-    }
-}
+// pub fn match_next<I, O, F>(matches: F) -> impl Fn(Vec<I>) -> IResult<Vec<I>, O, ParseError>
+// where
+//     F: Fn(I) -> Option<O>,
+//     I: Clone + 'static,
+// {
+//     move |input: Vec<I>| {
+//         let mut input = input.clone();
+//         let err = |input| {
+//             Err(Err::Error(ParseError::from_error_kind(
+//                 input,
+//                 ErrorKind::TakeTill1,
+//             )))
+//         };
+//
+//         if input.len() == 0 {
+//             return err(input);
+//         };
+//
+//         let first = input.remove(0);
+//         if let Some(out) = matches(first) {
+//             return Ok((input, out));
+//         };
+//
+//         err(input)
+//     }
+// }
 
 /// token tag
-pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Annotated<Token>> {
+pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Annotated<Token>, ParseError> {
     let tag = tag.clone();
     move |input: TokenBuffer| {
+        let tag = tag.clone();
         let mut input = input.clone();
         if input.len() == 0 {
-            let e: ErrorKind = ErrorKind::Tag;
-            return Err(Err::Error(ParseError::from_error_kind(input, e)));
+            return Err(Err::Error((input, TokenTagError(tag)).into()));
         };
 
         let tok = input.remove(0);
@@ -249,7 +251,6 @@ pub fn ttag(tag: &Token) -> impl Fn(TokenBuffer) -> IResult<TokenBuffer, Annotat
             return Ok((input, tok));
         };
 
-        let e: ErrorKind = ErrorKind::Tag;
-        Err(Err::Error(ParseError::from_error_kind(input, e)))
+        Err(Err::Error((input, TokenTagError(tag)).into()))
     }
 }

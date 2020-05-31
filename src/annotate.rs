@@ -1,12 +1,19 @@
 use crate::data::Expr;
 use crate::parse::shared::*;
+use crate::error::{ParseError, ParseErrorKind};
 use nom::IResult;
 use nom::{
-    error::{ErrorKind, ParseError},
+    error::{
+        ErrorKind as NomErrorKind,
+        ParseError as NomParseError,
+    },
     Err,
 };
 use std::fmt;
 use std::ops::Deref;
+
+// TODO: parameterize annotated errors
+use crate::lex::Token as T;
 
 #[derive(Clone, PartialEq)]
 pub struct Annotated<T> {
@@ -54,20 +61,17 @@ impl<T: fmt::Display> fmt::Display for Annotated<T> {
     }
 }
 
-pub fn annotated_terminal<T, F, O>(
+pub fn annotated_terminal<F, O>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<Annotated<O>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<Annotated<O>>, ParseError>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, O>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, O, ParseError>,
 {
     move |input: Vec<Annotated<T>>| {
         let idx = input.first().map(|x| x.idx);
         let last_idx_len = input.last().map(|x| x.idx + x.len);
         if idx.is_none() || last_idx_len.is_none() {
-            return Err(Err::Error(ParseError::from_error_kind(
-                input,
-                ErrorKind::Tag,
-            )));
+            return Err(Err::Error((input, ParseErrorKind::GenericError).into()));
         }
         let idx = idx.unwrap();
         let len = last_idx_len.unwrap() - idx;
@@ -78,19 +82,16 @@ where
     }
 }
 
-pub fn anno_prefix_parser<T, F, O: 'static>(
+pub fn anno_prefix_parser<F, O: 'static>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<O>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<O>>, ParseError>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<O>>>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<O>>, ParseError>,
 {
     move |input| {
         let idx = input.first().map(|x| x.idx);
         if idx.is_none() {
-            return Err(Err::Error(ParseError::from_error_kind(
-                input,
-                ErrorKind::Tag,
-            )));
+            return Err(Err::Error((input, ParseErrorKind::GenericError).into()));
         }
         let idx = idx.unwrap();
 
@@ -105,20 +106,17 @@ where
     }
 }
 
-pub fn anno_postfix_parser<T, F, O: 'static>(
+pub fn anno_postfix_parser<F, O: 'static>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<O>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoUnOp<O>>, ParseError>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<O>>>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoUnOp<O>>, ParseError>,
 {
     move |input| {
         let post_idx = input.first().map(|x| x.idx);
         let post_len = input.first().map(|x| x.len);
         if post_idx.is_none() || post_len.is_none() {
-            return Err(Err::Error(ParseError::from_error_kind(
-                input,
-                ErrorKind::Tag,
-            )));
+            return Err(Err::Error((input, ParseErrorKind::GenericError).into()));
         }
         let post_idx = post_idx.unwrap();
         let post_len = post_len.unwrap();
@@ -135,11 +133,11 @@ where
     }
 }
 
-pub fn anno_infix_parser<T, F, O: 'static>(
+pub fn anno_infix_parser<F, O: 'static>(
     parser: F,
-) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoBinOp<O>>>
+) -> impl Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PostAnnoBinOp<O>>, ParseError>
 where
-    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoBinOp<O>>>,
+    F: Fn(Vec<Annotated<T>>) -> IResult<Vec<Annotated<T>>, Box<dyn PreAnnoBinOp<O>>, ParseError>,
 {
     move |input| {
         let (input, cb_pre) = parser(input)?;

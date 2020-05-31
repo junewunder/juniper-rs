@@ -6,6 +6,7 @@ use crate::lex::{
     TokenBuffer,
 };
 use crate::parse::{expr::p_expr, shared::*};
+use crate::error::{ParseError, ParseErrorKind};
 use core::fmt::Error;
 use nom::{
     self,
@@ -14,7 +15,7 @@ use nom::{
     character::complete::{alpha1, char, space0, space1},
     combinator::{complete, not, peek},
     combinator::{map, opt},
-    error::{ErrorKind, ParseError},
+    error::{ErrorKind as NomErrorKind, ParseError as NomParseError},
     multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
@@ -23,11 +24,17 @@ use nom::{
 use std::collections::HashMap;
 use std::rc::Rc;
 
-pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
-    let (input, defs) = many0(annotated_terminal(alt((
+pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>, ParseError> {
+    println!("{:?}", complete(alt((
         p_fn_named, p_prim, p_struct, p_enum,
-    ))))(input)?;
-
+    )))(input.clone()));
+    let (input, defs) = many0(annotated_terminal(complete(alt((
+        p_fn_named,
+        p_fn_named,
+        // p_struct,
+        // p_enum,
+    )))))(input)?;
+    println!("helloooo", );
     Ok((input, defs))
 }
 
@@ -87,7 +94,7 @@ pub fn p_enum(input: TokenBuffer) -> DefnIResult {
     Ok((input, Defn::EnumD(name, variants.into())))
 }
 
-fn p_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>)> {
+fn p_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>), ParseError> {
     let (input, name) = take_ident(input)?;
     let (input, variants) = opt(|input| {
         let (input, _) = ttag(&T_OP_PAREN)(input)?;

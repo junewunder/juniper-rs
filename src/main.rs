@@ -20,6 +20,11 @@ mod lex;
 mod mixfix;
 mod parse;
 
+use crate::annotate::Annotated;
+use crate::data::Defn;
+use crate::lex::TokenBuffer;
+use crate::parse::ExprIResult;
+use crate::error::{ParseError, ParseErrorKind};
 use clap::Clap;
 use data::*;
 use std::fs;
@@ -75,22 +80,14 @@ fn interp_from_file(filename: &str) -> interp::InterpResult {
     interp::interp_program(ast)
 }
 
-use crate::annotate::Annotated;
-use crate::data::Defn;
-use crate::lex::TokenBuffer;
-use crate::parse::ExprIResult;
 use nom::IResult;
-fn parse_from_file(filename: &str) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
+fn parse_from_file(filename: &str) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>, ParseError> {
     let input = fs::read_to_string(filename).expect("Unable to read file");
     let input = input.as_ref();
     let filename = String::from(filename);
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     parse::p_defs(tokbuf)
 }
-
-// fn lex_from_file(filename: &str) -> IResult<&str, TokenBuffer> {
-//
-// }
 
 fn interp_expr(input: &str, env: &Env) -> interp::InterpResult {
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");

@@ -1,0 +1,7 @@
+fn main :: x => 1 + + 1
+
+
+  #print match "abc" {
+  #  "xyz" => "nope",
+  #  "abc" => "yep",
+  #}

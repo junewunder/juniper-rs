@@ -5,7 +5,8 @@ use crate::lex::{
     TokenBuffer,
 };
 use crate::mixfix::mixfix::{BinOp, UnOp};
-use nom::IResult;
+use crate::error::ParseError;
+use nom::{combinator::opt, multi::separated_list, IResult};
 
 #[rustfmt::skip]
 lazy_static! {
@@ -52,8 +53,8 @@ pub trait PreAnnoBinOp<O> = Fn(Box<Annotated<O>>, Box<Annotated<O>>) -> O;
 pub trait PostAnnoUnOp<O> = UnOp<Box<Annotated<O>>>;
 pub trait PostAnnoBinOp<O> = BinOp<Box<Annotated<O>>>;
 
-pub type DefnIResult = IResult<TokenBuffer, Defn>;
-pub type ExprIResult = IResult<TokenBuffer, Expr>;
-pub type UnOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoUnOp<Expr>>>;
-pub type BinOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoBinOp<Expr>>>;
+pub type DefnIResult = IResult<TokenBuffer, Defn, ParseError>;
+pub type ExprIResult = IResult<TokenBuffer, Expr, ParseError>;
+pub type UnOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoUnOp<Expr>>, ParseError>;
+pub type BinOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoBinOp<Expr>>, ParseError>;
 pub type TokIResult = IResult<TokenBuffer, Token>;
