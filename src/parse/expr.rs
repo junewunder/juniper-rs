@@ -19,7 +19,7 @@ use nom::{
     character::complete::{alpha1, char, space0, space1},
     combinator::map,
     combinator::{complete, not, opt, peek},
-    error::{ErrorKind, ParseError},
+    error::{ErrorKind as NomErrorKind, ParseError as NomParseError},
     multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
@@ -32,6 +32,7 @@ const P_SEMI: usize = 5;
 const P_LAM: usize = 10;
 const P_COMMA: usize = 20; // todo
 const P_LET: usize = 30;
+const P_DEREF: usize = 35;
 const P_ARR: usize = 40; // todo
 const P_OR: usize = 50;
 const P_AND: usize = 60;
@@ -42,19 +43,7 @@ const P_NEG: usize = 170;
 const P_POW: usize = 180; // todo
 const P_FAC: usize = 190; // todo
 const P_APP: usize = 200; // todo
-const P_DEREF: usize = 210;
-const P_ACCESS: usize = 220;
-
-fn a(expr: Expr, tokbuf_before: TokenBuffer, tokbuf_after: TokenBuffer) -> Box<Annotated<Expr>> {
-    let idx = tokbuf_before.first().unwrap().idx;
-    let len = tokbuf_after.first().map(|x| idx - x.idx).unwrap();
-
-    box Annotated {
-        tok: expr,
-        idx,
-        len,
-    }
-}
+const P_ACCESS: usize = 210;
 
 #[rustfmt::skip]
 fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>, ParseError> {
@@ -76,53 +65,31 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>, ParseEr
         infix_l: anno_infix_parser(p_seq)
         postfix: |input| {
             let (input, _) = ttag(&T_SEMICOLON)(input)?;
-            Ok((input, box |lhs| lhs))
+            Ok((input, box |lhs| box Annotated::zero(SeqE(lhs, box Annotated::zero(NullE)))))
         }
     });
 
-    new_op!(P_LAM {
-        prefix: anno_prefix_parser(alt((p_func_named, p_func_anon)))
-    });
+    new_op!(P_LAM { prefix: anno_prefix_parser(alt((p_func_named, p_func_anon))) });
 
-    new_op!(P_LET {
-        prefix: anno_prefix_parser(alt((p_let, p_if, p_while, p_mutable, p_mutate,)))
-    });
+    new_op!(P_LET { prefix: anno_prefix_parser(alt((p_let, p_if, p_while, p_mutable, p_mutate))) });
 
-    new_op!(P_OR {
-        infix_l: anno_infix_parser(p_or)
-    });
+    new_op!(P_DEREF { prefix: anno_prefix_parser(p_deref) });
 
-    new_op!(P_AND {
-        infix_l: anno_infix_parser(p_and)
-    });
+    new_op!(P_OR { infix_l: anno_infix_parser(p_or) });
 
-    new_op!(P_CMP {
-        infix: anno_infix_parser(alt((p_eq, p_lt, p_gt)))
-    });
+    new_op!(P_AND { infix_l: anno_infix_parser(p_and) });
 
-    new_op!(P_SUM {
-        infix_l: anno_infix_parser(alt((p_add, p_sub)))
-    });
+    new_op!(P_CMP { infix: anno_infix_parser(alt((p_eq, p_lt, p_gt))) });
 
-    new_op!(P_PROD {
-        infix_l: anno_infix_parser(alt((p_mult, p_div)))
-    });
+    new_op!(P_SUM { infix_l: anno_infix_parser(alt((p_add, p_sub))) });
 
-    new_op!(P_NEG {
-        prefix: anno_prefix_parser(p_neg)
-    });
+    new_op!(P_PROD { infix_l: anno_infix_parser(alt((p_mult, p_div))) });
 
-    new_op!(P_APP {
-        infix_l: anno_infix_parser(p_app)
-    });
+    new_op!(P_NEG { prefix: anno_prefix_parser(p_neg) });
 
-    new_op!(P_DEREF {
-        prefix: anno_prefix_parser(p_deref)
-    });
+    new_op!(P_APP { infix_l: anno_infix_parser(p_app) });
 
-    new_op!(P_ACCESS {
-        postfix: anno_postfix_parser(p_access)
-    });
+    new_op!(P_ACCESS { postfix: anno_postfix_parser(p_access) });
 
     MixfixParser {
         terminals: Rc::new(box annotated_terminal(box p_terminals)),
@@ -165,6 +132,7 @@ fn p_terminals(input: TokenBuffer) -> ExprIResult {
         p_parens,
         p_init_object,
         p_init_struct,
+        p_match,
         p_var,
     ))(input)
 }
@@ -172,9 +140,9 @@ fn p_terminals(input: TokenBuffer) -> ExprIResult {
 fn p_var(input: TokenBuffer) -> ExprIResult {
     let (input, x) = take_ident(input)?;
     if peek(ttag(&T_FAT_ARROW_R))(input.clone()).is_ok() {
-        return Err(Err::Error(ParseError::from_error_kind(
+        return Err(Err::Error(NomParseError::from_error_kind(
             input,
-            ErrorKind::Tag,
+            NomErrorKind::Tag,
         )));
     }
     Ok((input, VarE(x)))

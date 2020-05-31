@@ -11,6 +11,7 @@ extern crate im;
 extern crate lazy_static;
 #[macro_use]
 extern crate clap;
+extern crate rand;
 
 mod annotate;
 mod data;

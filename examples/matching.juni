@@ -1,0 +1,75 @@
+enum Option {
+  Some(value),
+  None
+}
+
+enum Result {
+  Ok(result),
+  Err(error)
+}
+
+fn give_this_back :: x => (
+  if (random x) > 0.5 then
+    Some x
+  else None
+)
+
+fn make_this_work :: x => (
+  if (random x) > 0.5 then
+    Ok x
+  else Err "oops! it didn't work :("
+)
+
+fn main :: x => (
+  let test_value = 42 in (
+
+    print ("test_value = " + test_value);
+    print "";
+
+    match give_this_back test_value {
+      ::Some(x) => print ("thanks for giving me back " + x),
+      ::None => print "oh no, you didn't give it back :(",
+    };
+    print "";
+
+    match make_this_work test_value {
+      ::Ok(x) => print ("yay, " + x + " worked!"),
+      ::Err(e) => print ("Q: why didn't it work? A: " + e),
+    };
+    print "";
+
+    let r_num = (round ((random 1) * 10)) in (
+      print ("r_num = " + r_num);
+      match r_num {
+        0 => print "zero'th?",
+        1 => print "first",
+        2 => print "second",
+        3 => print "third",
+        4 => print "fourth",
+        5 => print "fifth",
+        x => print ("" + x + ", too many to count")
+      };
+      print "";
+    );
+
+    match "abc" {
+      "xyz" => print "nope",
+      "abc" => print "yep",
+    };
+    print "";
+
+    let r_num = (round ((random 1) * 10)) in (
+      print ("r_num = " + r_num);
+      match ("r = " + r_num) {
+        "r = 0" => print "r is zero'th?",
+        "r = 1" => print "r is first",
+        "r = 2" => print "r is second",
+        "r = 3" => print "r is third",
+        "r = 4" => print "r is fourth",
+        "r = 5" => print "r is fifth",
+        x => print ("" + x + ", too many to count")
+      };
+      print "";
+    )
+  )
+)

@@ -3,10 +3,9 @@ authors = ["June Wunder <june@junewunder.com>"]
 edition = "2018"
 name = "juniper-rs"
 version = "0.1.0"
-
 [dependencies]
-im = "14.3.0"
-nom = "5.1.1"
-lazy_static = "1.4.0"
 clap = "3.0.0-beta.1"
-# cutlass = "0.1.0"
+im = "14.3.0"
+lazy_static = "1.4.0"
+nom = "5.1.1"
+rand = "0.7.3"

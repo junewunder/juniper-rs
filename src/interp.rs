@@ -12,6 +12,8 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     let mut env: Env = vec![
         ("delay".into(), Value::PrimV("delay".into())),
         ("print".into(), Value::PrimV("print".into())),
+        ("random".into(), Value::PrimV("random".into())),
+        ("round".into(), Value::PrimV("round".into())),
     ]
     .into_iter()
     .collect();
@@ -107,8 +109,8 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
 
     // println!("{:?}", e);
     match e {
-        NumE(i) => Ok(NumV(i)),
-        PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::NumE(i) => Ok(NumV(i)),
+        Expr::PlusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Ok(NumV(i1 + i2)),
             (StringV(s1), StringV(s2)) => Ok(StringV(s1 + &s2)),
             (StringV(s1), NumV(s2)) => Ok(StringV(s1 + &s2.to_string())),
@@ -117,75 +119,76 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             (StringV(s1), MutV(s2)) => Ok(StringV(s1 + &(*s2.borrow().clone()).to_string())),
             _ => err!(TypeError),
         },
-        MinusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::MinusE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Ok(NumV(i1 - i2)),
             _ => err!(TypeError),
         },
-        MultE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::MultE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Ok(NumV(i1 * i2)),
             _ => err!(TypeError),
         },
-        DivE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::DivE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Ok(NumV(i1 / i2)),
             _ => err!(TypeError),
         },
-        LtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::LtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Ok(BoolV(i1 < i2)),
             _ => err!(TypeError),
         },
-        GtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::GtE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (NumV(i1), NumV(i2)) => Ok(BoolV(i1 > i2)),
             _ => err!(TypeError),
         },
-        NegE(e) => match interp(e, env)? {
+        Expr::NegE(e) => match interp(e, env)? {
             NumV(i) => Ok(NumV(-i)),
             _ => err!(TypeError),
         },
-        BoolE(b) => Ok(BoolV(b)),
-        AndE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::BoolE(b) => Ok(BoolV(b)),
+        Expr::AndE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (BoolV(b1), BoolV(b2)) => Ok(BoolV(b1 && b2)),
             _ => err!(TypeError),
         },
-        OrE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::OrE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (BoolV(b1), BoolV(b2)) => Ok(BoolV(b1 || b2)),
             _ => err!(TypeError),
         },
-        EqE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
+        Expr::EqE(e1, e2) => match (interp(e1, env)?, interp(e2, env)?) {
             (BoolV(b1), BoolV(b2)) => Ok(BoolV(b1 == b2)),
             (NumV(b1), NumV(b2)) => Ok(BoolV(b1 == b2)),
             _ => err!(TypeError),
         },
-        IfE(pred, thn, els) => match interp(pred, env)? {
+        Expr::IfE(pred, thn, els) => match interp(pred, env)? {
             BoolV(true) => interp(thn, env),
             BoolV(false) => interp(els, env),
             _ => err!(TypeError),
         },
-        StringE(s) => Ok(Value::StringV(s)),
-        VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
+        Expr::StringE(s) => Ok(Value::StringV(s)),
+        Expr::NullE => Ok(NullV),
+        Expr::VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
             kind: UndefinedError(x),
             idx: err_idx,
             len: err_len,
             loc: None,
         }),
-        LetE(x, e, body) => {
+        Expr::LetE(x, e, body) => {
             let v = interp(e, env)?;
             let next_env = env.update(x, v);
             interp(body, &next_env)
         }
-        MutableE(x, e, body) => {
+        Expr::MutableE(x, e, body) => {
             let v = interp(e, env)?;
             let v = MutV(Rc::new(RefCell::new(Box::new(v))));
             let next_env = env.update(x, v);
             interp(body, &next_env)
         }
-        MutateE(xe, e) => {
+        Expr::MutateE(xe, e) => {
             let v = interp(e, env)?;
             if let MutV(x) = interp(xe, env)? {
                 x.replace(Box::new(v));
             }
             Ok(NullV)
         }
-        DerefE(e) => {
+        Expr::DerefE(e) => {
             let v = interp(e, env)?;
             match v {
                 MutV(cell) => Ok(*cell.borrow().clone()),
@@ -193,11 +196,11 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
                 _ => err!(DerefError(v)),
             }
         }
-        SeqE(e1, e2) => {
+        Expr::SeqE(e1, e2) => {
             interp(e1, env)?;
             interp(e2, env)
         }
-        FnE(name, x, body) => match name {
+        Expr::FnE(name, x, body) => match name {
             Some(name) => {
                 let env_cell = RefCell::new(env.clone());
                 let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
@@ -209,17 +212,17 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             }
             None => Ok(CloV(None, x, body, Rc::new(env.clone()))),
         },
-        AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
+        Expr::AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
             (CloV(_, arg, body, mut local_env), arg_v) => {
                 interp(body, &local_env.update(arg, arg_v))
             }
             (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]),
             _ => err!(TypeError),
         },
-        AppPrimE(f, xs) => {
+        Expr::AppPrimE(f, xs) => {
             interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
         }
-        WhileE(pred, body) => {
+        Expr::WhileE(pred, body) => {
             // TODO: This seems a little extreme to CLONE the pred and body every time use Rc for exprs???
             loop {
                 match interp(pred.clone(), env)? {
@@ -231,7 +234,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             }
             Ok(Value::NullV)
         }
-        InitObjectE(fields) => {
+        Expr::InitObjectE(fields) => {
             let mut field_vs = HashMap::new();
             for (x, e) in fields.into_iter() {
                 field_vs.insert(x, Rc::new(interp(e, env)?));
@@ -239,7 +242,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
 
             Ok(ObjectV(None, field_vs))
         }
-        InitStructE(name, fields) => {
+        Expr::InitStructE(name, fields) => {
             let allowed_fields = match env.get(&name) {
                 Some(StructV(name, fields)) => fields,
                 _ => return err!(UndefinedError(name)),
@@ -261,14 +264,14 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
 
             Ok(ObjectV(Some(name), field_vs))
         }
-        InitEnumVariantE(enum_name, variant, args) => {
+        Expr::InitEnumVariantE(enum_name, variant, args) => {
             let args = args
                 .iter()
                 .map(|arg| env.get(arg).unwrap().clone())
                 .collect();
             Ok(EnumV(enum_name, variant, args))
         }
-        AccessE(e, x) => {
+        Expr::AccessE(e, x) => {
             let v = match interp(e, env)? {
                 ObjectV(_, fields) => fields.get(&x).cloned().ok_or_else(|| InterpError {
                     kind: UndefinedError(x),
@@ -281,7 +284,44 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
 
             Ok(RefV(v))
         }
+        Expr::MatchE(subject, patterns) => {
+            use MatchPattern::*;
+            // TODO: implement a recursive version of this as a separate function
+            let subject = interp(subject, env)?;
+            for (pattern, body) in patterns.iter() {
+                if let Some(extension) = match_subject(&subject, pattern) {
+                    let extended_env: Env = extension.union(env.clone());
+                    return interp_expr(body.clone(), &extended_env);
+                }
+            }
+            err!(NoMatchError(subject))
+        }
         _ => err!(UnimplementedBehavior),
+    }
+}
+
+fn match_subject(subject: &Value, pattern: &MatchPattern) -> Option<Env> {
+    match (subject, pattern) {
+        (Value::EnumV(enum_name, variant, vs), MatchPattern::VariantPat(variant_exp, patterns))
+            if patterns.len() == vs.len() && variant == variant_exp =>
+        {
+            vs.iter()
+                .zip(patterns)
+                .map(|(s, p)| match_subject(s, p))
+                .collect::<Option<Vec<Env>>>()
+                .map(|envs| {
+                    envs.iter().fold(HashMap::new(), |acc, env| acc.union(env.clone()))
+                })
+        }
+        (Value::StringV(str_v), MatchPattern::StringPat(str_p)) if str_v == str_p => {
+            Some(HashMap::new())
+        }
+        (Value::NumV(num_v), MatchPattern::NumPat(num_p)) if num_v == num_p => Some(HashMap::new()),
+        (value, MatchPattern::AnyPat(name)) => {
+            // TODO: HashMap::singleton doesn't exist?
+            Some(HashMap::new().update(name.clone(), value.clone()))
+        }
+        _ => None,
     }
 }
 
@@ -291,7 +331,10 @@ fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
     match name.as_str() {
         "print" => {
             if let Some(v) = values.first() {
-                println!("{}", v);
+                match v {
+                    StringV(s) => println!("{}", s),
+                    _ => println!("{}", v),
+                }
             } else {
                 println!("None");
             }
@@ -307,6 +350,19 @@ fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
                 Ok(PrimV("delay".into()))
             }
         }
+        "random" => Ok(NumV(rand::random())),
+        "round" => {
+            use std::{thread, time};
+            if let Some(NumV(n)) = values.first() {
+                Ok(NumV(n.round()))
+            } else {
+                Ok(PrimV("round".into()))
+            }
+        }
         _ => panic!("no primitive named: {:?}", name),
     }
+}
+
+extern "C" {
+    fn srand() -> u32;
 }
