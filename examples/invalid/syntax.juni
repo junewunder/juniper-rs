@@ -1,7 +1,9 @@
-fn main :: x => 1 + + 1
+enum Hello {
+  X, Y, Z
+}
 
-
-  #print match "abc" {
-  #  "xyz" => "nope",
-  #  "abc" => "yep",
-  #}
+fn main :: x =>
+  match Some 1 {
+    ::Some x => x
+    ::None => 2
+  }

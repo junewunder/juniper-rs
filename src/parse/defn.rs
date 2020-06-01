@@ -13,28 +13,24 @@ use nom::{
     branch::alt,
     bytes::complete::take_until,
     character::complete::{alpha1, char, space0, space1},
-    combinator::{complete, not, peek},
-    combinator::{map, opt},
+    combinator::{complete, not, peek, map, opt, cut},
     error::{ErrorKind as NomErrorKind, ParseError as NomParseError},
     multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
     sequence::delimited,
     sequence::pair,
+    sequence::terminated,
     Err, IResult,
 };
 use std::collections::HashMap;
 use std::rc::Rc;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>, ParseError> {
-    // println!("JUST ALT {:?}", alt((
-    //     p_fn_named, p_prim, p_struct, p_enum,
-    // ))(input.clone()));
-    let (input, defs) = complete(many1(annotated_terminal(alt((
+    let (input, defs) = terminated(many1(annotated_terminal(alt((
         p_fn_named,
         p_prim,
         p_struct,
         p_enum,
-    )))))(input)?;
-    // println!("helloooo", );
+    )))), ttag(&Token::EOF))(input)?;
     Ok((input, defs))
 }
 

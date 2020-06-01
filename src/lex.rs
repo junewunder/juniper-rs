@@ -70,6 +70,7 @@ pub enum Token {
     Num(f64),
     Comment,
     Ident(String),
+    EOF,
 }
 
 pub fn lex(input: &str) -> IResult<&str, TokenBuffer> {
@@ -88,10 +89,16 @@ pub fn lex(input: &str) -> IResult<&str, TokenBuffer> {
 
     let (input, tokbuf) = many0(annotated(state, tokalt))(input)?;
 
-    let tokbuf = tokbuf
+    let mut tokbuf: Vec<_> = tokbuf
         .into_iter()
         .filter(|x| (*x).tok != Token::Comment && (*x).tok != Token::Space)
         .collect();
+
+    tokbuf.push(Annotated {
+        tok: Token::EOF,
+        idx: tokbuf.last().map_or(0, |x| x.idx + x.len - 1),
+        len: 0,
+    });
 
     Ok((input, tokbuf))
 }

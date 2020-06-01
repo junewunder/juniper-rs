@@ -25,7 +25,7 @@ use crate::annotate::Annotated;
 use crate::data::Defn;
 use crate::lex::TokenBuffer;
 use crate::parse::ExprIResult;
-use crate::error::{ParseError, ParseErrorKind};
+use crate::error::{ParseError, ParseErrorKind, display_nom_err};
 use clap::Clap;
 use data::*;
 use std::fs;
@@ -53,13 +53,15 @@ fn main() {
         let input = fs::read_to_string(opts.target.as_str()).expect("Unable to read file");
         lex::lex(input.clone().as_str())
             .map(|v| println!("{:#?}", v))
-            .map_err(|mut e| println!("{:#?}", e));
+            .map_err(|mut e| println!("{}", e));
     }
 
     if opts.parse {
         parse_from_file(opts.target.as_str())
             .map(|v| println!("{:#?}", v))
-            .map_err(|mut e| println!("{:#?}", e));
+            .map_err(|mut e| {
+                display_nom_err(e, Some(opts.target.clone()));
+            });
     }
 
     if !opts.no_run {
@@ -98,7 +100,9 @@ fn interp_expr(input: &str, env: &Env) -> interp::InterpResult {
 
 fn parse_expr(input: &str) -> Box<annotate::Annotated<Expr>> {
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
-    let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
+    let (r, ast) = parse::p_expr(tokbuf)
+        // .map_err(display_nom_err)
+        .expect("expr failed parsing");
     ast
 }
 

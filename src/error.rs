@@ -81,13 +81,27 @@ pub enum ParseErrorKind {
     GenericError
 }
 
+pub fn display_nom_err(e: nom::Err<ParseError>, filename: Option<String>) {
+    use nom::{Err, Needed};
+    match e {
+        Err::Incomplete(Needed::Size(u)) => println!("Parsing requires {} bytes/chars", u),
+        Err::Incomplete(Needed::Unknown) => println!("Parsing requires more data"),
+        Err::Failure(mut c) | Err::Error(mut c) => {
+            c.loc = filename;
+            // println!("c = {:?}", c);
+            println!("Parsing Error: {}", c)
+        },
+    }
+}
+
 impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        // println!("HELLOOOOO", );
         use ParseErrorKind::*;
 
         let err_msg: String = match self.kind.clone() {
-            ParseErrorKind::NomError(e) => format!("nom error: {:?}", e),
-            ParseErrorKind::GenericError => format!("generic error"),
+            // ParseErrorKind::NomError(e) => format!("nom error: {:?}", e),
+            // ParseErrorKind::GenericError => format!("generic error"),
             x => format!("{:?}", x),
         };
 
@@ -97,7 +111,7 @@ impl fmt::Display for ParseError {
                     .expect(&format!("Unable to read file \"{}\"", loc));
                 let line = calc_line(&self, &contents);
                 let snippet = display_from_file(&contents, self.idx, self.len, line);
-                write!(f, "{} at line {}\n{}", err_msg, line, snippet)
+                write!(f, "\n{} at line {}\n{}\n", err_msg, line, snippet)
             }
             None => write!(f, "{} in <unknown file>", err_msg),
         }
@@ -172,7 +186,8 @@ fn calc_line<T>(err: &AnnotatedError<T>, contents: &String) -> usize {
 }
 
 fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize) -> String {
-    let mut line_num = line_num - 1;
+    println!("{:?}", line_num);
+    let mut line_num = line_num;
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
     let contents =
@@ -180,8 +195,9 @@ fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize)
     let contents = contents
         .lines()
         .map(|line| {
+            let s = format!("{:?}.\t{}\n", line_num, line);
             line_num += 1;
-            format!("{:?}.\t{}\n", line_num, line)
+            s
         })
         .collect::<String>()
         .trim_end_matches('\n')
