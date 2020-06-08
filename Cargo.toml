@@ -5,7 +5,7 @@ name = "juniper-rs"
 version = "0.1.0"
 [dependencies]
 clap = "3.0.0-beta.1"
-im = "14.3.0"
+im = "15.0.0"
 lazy_static = "1.4.0"
 nom = "5.1.1"
 rand = "0.7.3"
