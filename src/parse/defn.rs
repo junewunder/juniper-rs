@@ -31,6 +31,13 @@ pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn
     Ok((input, defs))
 }
 
+// pub fn p_type(input: TokenBuffer) ->
+pub fn p_type(input: TokenBuffer) -> TypeIResult {
+    let (input, x) = take_ident(input)?;
+    Ok((input, VarE(x)))
+}
+
+
 pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_FN)(input)?;
     let (input, name) = take_ident(input)?;

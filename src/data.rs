@@ -152,5 +152,4 @@ pub fn print_env_safe(env: &Rc<Env>) -> String {
 }
 
 pub type Env = HashMap<String, Value>;
-
-pub type Store = HashMap<i32, Value>;
+pub type TEnv = HashMap<String, Type>;
