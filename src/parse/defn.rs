@@ -37,7 +37,6 @@ pub fn p_type(input: TokenBuffer) -> TypeIResult {
     Ok((input, VarE(x)))
 }
 
-
 pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_FN)(input)?;
     let (input, name) = take_ident(input)?;

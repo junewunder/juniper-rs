@@ -55,7 +55,8 @@ pub trait PostAnnoUnOp<O> = UnOp<Box<Annotated<O>>>;
 pub trait PostAnnoBinOp<O> = BinOp<Box<Annotated<O>>>;
 
 pub type DefnIResult = IResult<TokenBuffer, Defn>;
-pub type ExprIResult = IResult<TokenBuffer, Expr>; //, crate::error::ParseError
+pub type ExprIResult = IResult<TokenBuffer, Expr>;
+pub type TypeIResult = IResult<TokenBuffer, Type>;
 pub type UnOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoUnOp<Expr>>>;
 pub type BinOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoBinOp<Expr>>>;
 pub type TokIResult = IResult<TokenBuffer, Token>;

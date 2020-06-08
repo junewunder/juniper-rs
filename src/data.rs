@@ -4,6 +4,8 @@ use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
+pub type Env = HashMap<String, Value>;
+pub type TEnv = HashMap<String, Type>;
 type Wrap<T> = Box<Annotated<T>>;
 type StructFields = Vec<String>;
 
@@ -93,7 +95,7 @@ pub enum Type {
     NullT,
     AnyT,
     ObjectT,
-    StructT(String),
+    StructT(String, HashMap<String, Type>),
 }
 
 impl Display for Value {
@@ -150,6 +152,3 @@ pub fn print_env_safe(env: &Rc<Env>) -> String {
     env_str.trim_end_matches(", ");
     format!("{} }}", env_str)
 }
-
-pub type Env = HashMap<String, Value>;
-pub type TEnv = HashMap<String, Type>;
