@@ -1,4 +1,4 @@
-use crate::data::Value;
+use crate::data::{Type, Expr, Value};
 use std::error;
 use std::fmt::{self, Formatter};
 use std::fs;
@@ -9,16 +9,9 @@ use nom::error::{
     ParseError as NomParseError,
 };
 
-// #[derive(Debug, Clone)]
-// pub struct InterpError {
-//     pub kind: InterpErrorKind,
-//     pub idx: usize,
-//     pub len: usize,
-//     pub loc: Option<String>,
-// }
-
-pub type InterpError = AnnotatedError<InterpErrorKind>;
 pub type ParseError = AnnotatedError<ParseErrorKind>;
+pub type TypeError = AnnotatedError<TypeErrorKind>;
+pub type InterpError = AnnotatedError<InterpErrorKind>;
 
 #[derive(Debug, Clone)]
 pub struct AnnotatedError<ErrorKind> {
@@ -28,7 +21,7 @@ pub struct AnnotatedError<ErrorKind> {
     pub loc: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InterpErrorKind {
     TypeError,
     UndefinedError(String),
@@ -36,6 +29,14 @@ pub enum InterpErrorKind {
     MissingFieldError(String),
     ExtraFieldError(String),
     NoMatchError(Value),
+    UnimplementedBehavior,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeErrorKind {
+    TempFiller,
+    UndefinedError(String),
+    DerefError(Type),
     UnimplementedBehavior,
 }
 

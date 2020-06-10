@@ -20,6 +20,7 @@ mod interp;
 mod lex;
 mod mixfix;
 mod parse;
+mod typecheck;
 
 use clap::Clap;
 use data::*;

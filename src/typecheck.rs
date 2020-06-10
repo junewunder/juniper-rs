@@ -5,90 +5,11 @@ use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type DefFnEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
-pub type TypeResult = std::result::Result<Type, InterpError>;
-
-pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> TypeResult {
-    let mut env: Env = vec![
-        ("delay".into(), Value::PrimV("delay".into())),
-        ("print".into(), Value::PrimV("print".into())),
-        ("random".into(), Value::PrimV("random".into())),
-        ("round".into(), Value::PrimV("round".into())),
-    ]
-    .into_iter()
-    .collect();
-
-    let env = defs.iter().fold(env, interp_scopeless_defs);
-
-    let env_cell = RefCell::new(env);
-    let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
-
-    let denv: DefFnEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
-    for (name, (arg, body)) in denv.into_iter() {
-        env_cell.borrow_mut().insert(
-            name.clone(),
-            Value::CloV(Some(name), arg, body, env_rc.clone()),
-        );
-    }
-
-    // println!("{}", print_env_safe(&env_rc));
-    if let Some(Value::CloV(_, arg, body, env)) = env_rc.get("main".into()) {
-        return check_expr(body.clone(), &env);
-    }
-
-    panic!("no <main> method")
-}
-
-fn interp_fn_defs(denv: DefFnEnv, def: Box<Annotated<Defn>>) -> DefFnEnv {
-    use Defn::*;
-    match def.unwrap() {
-        FnD(name, x, expr) => denv.update(name, (x, expr)),
-        _ => denv,
-    }
-}
-
-fn interp_scopeless_defs(env: Env, def: &Box<Annotated<Defn>>) -> Env {
-    use Defn::*;
-    use Value::*;
-    match def.cloned() {
-        StructD(name, fields) => {
-            env.update(name.clone(), Value::StructV(name.clone(), fields.clone()))
-        }
-        PrimD(name, mut xs) => {
-            let app = box Expr::AppPrimE(name.clone(), xs.clone());
-            let arg0 = xs.remove(0);
-            let body = xs.iter().fold(box Annotated::zero(*app), |acc, x| {
-                box Annotated::zero(Expr::FnE(None, x.into(), acc))
-            });
-            env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
-        }
-        EnumD(enum_name, variants) => variants.iter().fold(env, |env, (name, xs)| {
-            if xs.len() == 0 {
-                return env.update(
-                    name.clone(),
-                    Value::EnumV(enum_name.clone(), name.clone(), Vec::with_capacity(0)),
-                );
-            }
-            let mut xs = xs.clone();
-            let init_enum_var = Expr::InitEnumVariantE(enum_name.clone(), name.clone(), xs.clone());
-            let arg0 = xs.remove(0);
-            let body = xs
-                .iter()
-                .fold(box Annotated::zero(init_enum_var), |acc, x| {
-                    box Annotated::zero(Expr::FnE(None, x.into(), acc))
-                });
-            env.update(
-                name.clone(),
-                CloV(None, arg0, body, Rc::new(HashMap::new())),
-            )
-        }),
-        _ => env,
-    }
-}
+pub type TypeResult = std::result::Result<Type, TypeError>;
 
 pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
     use Expr::*;
-    use InterpErrorKind::*;
+    use TypeErrorKind::*;
     use Type::*;
     let check = check_expr;
 
@@ -98,7 +19,7 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
 
     macro_rules! err {
         ($variant:expr) => {
-            Err(InterpError {
+            Err(TypeError {
                 kind: $variant,
                 idx: err_idx,
                 len: err_len,
@@ -117,32 +38,32 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
             (StringT, BoolT) => Ok(StringT),
             // TODO: (StringT, s2 @ ObjectV(_, _)) => Ok(StringT),
             // TODO: (StringV(s1), MutV(s2)) => Ok(StringT),
-            _ => err!(TypeError),
+            _ => err!(TempFiller),
         },
         Expr::MinusE(e1, e2) |
         Expr::MultE(e1, e2) |
         Expr::DivE(e1, e2) => match (check(e1, env)?, check(e2, env)?) {
             (NumT, NumT) => Ok(NumT),
-            _ => err!(TypeError),
+            _ => err!(TempFiller),
         },
         Expr::LtE(e1, e2) |
         Expr::GtE(e1, e2) => match (check(e1, env)?, check(e2, env)?) {
             (NumT, NumT) => Ok(BoolT),
-            _ => err!(TypeError),
+            _ => err!(TempFiller),
         },
         Expr::NegE(e) => match check(e, env)? {
             NumT => Ok(NumT),
-            _ => err!(TypeError),
+            _ => err!(TempFiller),
         },
         Expr::BoolE(b) => Ok(BoolT),
         Expr::AndE(e1, e2) | Expr::OrE(e1, e2) =>
             match (check(e1, env)?, check(e2, env)?) {
                 (BoolT, BoolT) => Ok(BoolT),
-                _ => err!(TypeError),
+                _ => err!(TempFiller),
             },
         Expr::EqE(e1, e2) => match (check(e1, env)?, check(e2, env)?) {
             (BoolT, BoolT) | (NumT, NumT) => Ok(BoolT),
-            _ => err!(TypeError),
+            _ => err!(TempFiller),
         },
         Expr::IfE(pred, thn, els) => match check(pred, env)? {
             BoolT => {
@@ -151,14 +72,14 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
                 if t_thn == t_els {
                     Ok(t_thn)
                 } else {
-                    err!(TypeError)
+                    err!(TempFiller)
                 }
             },
-            _ => err!(TypeError),
+            _ => err!(TempFiller),
         },
         Expr::StringE(s) => Ok(StringT),
-        Expr::NullE => Ok(NullT),
-        Expr::VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
+        Expr::UnitE => Ok(UnitT),
+        Expr::VarE(x) => env.get(&x).cloned().ok_or_else(|| TypeError {
             kind: UndefinedError(x),
             idx: err_idx,
             len: err_len,
@@ -181,53 +102,34 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
             // if let MutT(t) = check(xe, env)? {
             //     x.replace(Box::new(v));
             // }
-            Ok(NullT)
+            Ok(UnitT)
         }
         Expr::DerefE(e) => {
-            let v = check(e, env)?;
-            match v {
-                MutT(cell) => Ok(*cell.borrow().clone()),
-                RefT(rc) => Ok((*rc).clone()),
-                _ => err!(DerefError(v)),
+            match check(e, env)? {
+                MutT(inner) | RefT(inner) => Ok(*inner.clone()),
+                t => err!(DerefError(t)),
             }
         }
         Expr::SeqE(e1, e2) => {
             check(e1, env)?;
             check(e2, env)
         }
-        Expr::FnE(name, x, body) => match name {
-            Some(name) => {
-                let env_cell = RefCell::new(env.clone());
-                let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
-                env_cell.borrow_mut().insert(
-                    name.clone(),
-                    Value::CloV(Some(name.clone()), x, body, env_rc.clone()),
-                );
-                Ok(env_rc.get(&name).unwrap().clone())
-            }
-            None => Ok(CloV(None, x, body, Rc::new(env.clone()))),
-        },
-        Expr::AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
-            (CloV(_, arg, body, mut local_env), arg_v) => {
-                interp(body, &local_env.update(arg, arg_v))
-            }
-            (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]),
-            _ => err!(TypeError),
-        },
-        Expr::AppPrimE(f, xs) => {
-            interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
-        }
+        // TODO: functions
+        // Expr::FnE(name, x, body) => Ok(CloT(name, UnitT/*TODO:get type from param*/, check(body))),
+        // Expr::AppE(f, param) => match (interp(f, env)?, interp(param, env)?) {
+        //     (CloV(_, arg, body, mut local_env), arg_v) => {
+        //         interp(body, &local_env.update(arg, arg_v))
+        //     }
+        //     (PrimV(name), arg_v) => interp_prim(name, vec![arg_v]),
+        //     _ => err!(TypeError),
+        // },
+        // Expr::AppPrimE(f, xs) => {
+        //     interp_prim(f, xs.iter().map(|x| env.get(x).cloned().unwrap()).collect())
+        // }
         Expr::WhileE(pred, body) => {
-            // TODO: This seems a little extreme to CLONE the pred and body every time use Rc for exprs???
-            loop {
-                match interp(pred.clone(), env)? {
-                    BoolV(true) => (),
-                    BoolV(false) => break,
-                    _ => return err!(TypeError),
-                };
-                interp(body.clone(), env)?;
-            }
-            Ok(Value::NullV)
+            check(pred.clone(), env)?;
+            check(body.clone(), env)?;
+            Ok(UnitT)
         }
         Expr::InitObjectE(fields) => {
             let mut field_vs = HashMap::new();

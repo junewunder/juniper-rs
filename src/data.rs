@@ -84,15 +84,16 @@ pub enum Value {
     NullV,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     NumT,
     BoolT,
     StringT,
     MutT(Box<Type>),
+    RefT(Box<Type>),
     PrimT,
-    CloT,
-    NullT,
+    CloT(Option<String>, Box<Type>, Box<Type>),
+    UnitT,
     AnyT,
     ObjectT,
     StructT(String, HashMap<String, Type>),
