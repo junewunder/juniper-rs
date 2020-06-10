@@ -33,7 +33,7 @@ pub enum Expr {
     IfE(Wrap<Expr>, Wrap<Expr>, Wrap<Expr>),
 
     StringE(String),
-    NullE,
+    UnitE,
 
     VarE(String),
     LetE(String, Wrap<Expr>, Wrap<Expr>),
@@ -79,7 +79,7 @@ pub enum Value {
     ObjectV(Option<String>, HashMap<String, Rc<Value>>),
     CloV(Option<String>, String, Wrap<Expr>, Rc<Env>),
     EnumV(String, String, Vec<Value>),
-    NullV,
+    UnitV,
 }
 
 #[derive(Debug)]
@@ -90,7 +90,7 @@ pub enum Type {
     MutT(Box<Type>),
     PrimT,
     CloT,
-    NullT,
+    UnitT,
     AnyT,
     ObjectT,
     StructT(String),
@@ -107,6 +107,7 @@ impl Display for Value {
             RefV(m) => write!(f, "ref {}", *m),
             PrimV(p) => write!(f, "<prim {}>", p),
             CloV(name, arg, expr, env) => {
+                let arg = if arg == "_" { "()" } else { arg };
                 let name = name.clone().unwrap_or("{anon}".to_string());
                 write!(f, "<fn {} :: {} {}>", name, arg, print_env_safe(env))
             }
@@ -133,7 +134,7 @@ impl Display for Value {
                 }
                 write!(f, "{}::{}{}", enum_name, variant, args_str)
             }
-            NullV => write!(f, "null"),
+            UnitV => write!(f, "unit"),
             x => write!(f, "{:?}", x),
         }
     }
@@ -143,8 +144,13 @@ pub fn print_env_safe(env: &Rc<Env>) -> String {
     let mut env_str = format!("{{ ");
     for (k, v) in env.iter() {
         match v {
-            Value::CloV(_, arg, _, _) => env_str = format!("{}{}: <fn {}>, ", env_str, k, arg),
-            _ => env_str = format!("{}: {}, ", k, v),
+            Value::CloV(_, arg, _, _) if arg == "_" => {
+                env_str = format!("{}{}: <fn ()>, ", env_str, k)
+            }
+            Value::CloV(_, arg, _, _) => {
+                env_str = format!("{}{}: <fn {}>, ", env_str, k, arg)
+            }
+            _ => env_str = format!("{}{}: {}, ", env_str, k, v),
         }
     }
     env_str.trim_end_matches(", ");

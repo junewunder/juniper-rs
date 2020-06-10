@@ -65,7 +65,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
         infix_l: anno_infix_parser(p_seq)
         postfix: |input| {
             let (input, _) = ttag(&T_SEMICOLON)(input)?;
-            Ok((input, box |lhs| box Annotated::zero(SeqE(lhs, box Annotated::zero(NullE)))))
+            Ok((input, box |lhs| box Annotated::zero(SeqE(lhs, box Annotated::zero(UnitE)))))
         }
     });
 
@@ -126,6 +126,7 @@ pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> 
 
 fn p_terminals(input: TokenBuffer) -> ExprIResult {
     alt((
+        p_unit,
         p_num,
         p_bool,
         p_string,
@@ -135,6 +136,18 @@ fn p_terminals(input: TokenBuffer) -> ExprIResult {
         p_match,
         p_var,
     ))(input)
+}
+
+fn p_unit(input: TokenBuffer) -> ExprIResult {
+    let (input, _) = ttag(&T_OP_PAREN)(input)?;
+    let (input, _) = ttag(&T_CL_PAREN)(input)?;
+    if peek(ttag(&T_FAT_ARROW_R))(input.clone()).is_ok() {
+        return Err(Err::Error(NomParseError::from_error_kind(
+            input,
+            NomErrorKind::Tag,
+        )));
+    }
+    Ok((input, UnitE))
 }
 
 fn p_var(input: TokenBuffer) -> ExprIResult {
@@ -297,7 +310,10 @@ pub fn p_while(input: TokenBuffer) -> UnOpIResult {
 }
 
 pub fn p_func_anon(input: TokenBuffer) -> UnOpIResult {
-    let (input, x) = take_ident(input)?;
+    let (input, x) = alt((
+        take_ident,
+        map(p_unit_arg, |_| String::from("_"))
+    ))(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     Ok((input, box move |body| FnE(None, x.clone(), body)))
 }
@@ -306,7 +322,10 @@ pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
     let (input, _) = opt(ttag(&T_FN))(input)?;
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
-    let (input, arg) = take_ident(input)?;
+    let (input, arg) = alt((
+        take_ident,
+        map(p_unit_arg, |_| String::from("_"))
+    ))(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     Ok((input, box move |body| {
         FnE(Some(name.clone()), arg.clone(), body)
