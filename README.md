@@ -4,6 +4,9 @@ This is a toy programming language that I plan on using to add fun features to a
 
 An interesting part of this repository is a mixfix parser (located in `src/mixfix/mixfix.rs`). [The algorithm was copied from here.](https://github.com/uvm-plaid/uvmhs/blob/master/src/UVMHS/Lib/Parser/Mixfix.hs)
 
+## questions
+ - how to do implement no-arg functions like `random`
+
 ## features so far:
 
  - bools, numbers, strings
@@ -16,16 +19,10 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 
 ## features to do:
 
- - PARSER ERRORS
  - error reporting on parsing
- - error reporting on parsing
- - error reporting on parsing
- - PARSER ERRORS
-
  - modules
  - top level constants -> create BlockV which is closure but without arguments
  - REPL functionality
- - custom parser error type
  - parse values from command line to main function
  - detect when mut value is trying to be used without being dereferenced
  - use Weak reference counting in CloV
