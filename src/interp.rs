@@ -163,7 +163,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             _ => err!(TypeError),
         },
         Expr::StringE(s) => Ok(Value::StringV(s)),
-        Expr::NullE => Ok(NullV),
+        Expr::UnitE => Ok(UnitV),
         Expr::VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
             kind: UndefinedError(x),
             idx: err_idx,
@@ -186,7 +186,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             if let MutV(x) = interp(xe, env)? {
                 x.replace(Box::new(v));
             }
-            Ok(NullV)
+            Ok(UnitV)
         }
         Expr::DerefE(e) => {
             let v = interp(e, env)?;
@@ -232,7 +232,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
                 };
                 interp(body.clone(), env)?;
             }
-            Ok(Value::NullV)
+            Ok(Value::UnitV)
         }
         Expr::InitObjectE(fields) => {
             let mut field_vs = HashMap::new();
@@ -345,7 +345,7 @@ fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
             if let Some(NumV(n)) = values.first() {
                 let ten_millis = time::Duration::from_millis(*n as u64);
                 thread::sleep(ten_millis);
-                Ok(NullV)
+                Ok(UnitV)
             } else {
                 Ok(PrimV("delay".into()))
             }
