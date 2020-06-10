@@ -60,3 +60,9 @@ pub type TypeIResult = IResult<TokenBuffer, Type>;
 pub type UnOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoUnOp<Expr>>>;
 pub type BinOpIResult = IResult<TokenBuffer, Box<dyn PreAnnoBinOp<Expr>>>;
 pub type TokIResult = IResult<TokenBuffer, Token>;
+
+pub fn p_unit_arg(input: TokenBuffer) -> ExprIResult {
+    let (input, _) = ttag(&T_OP_PAREN)(input)?;
+    let (input, _) = ttag(&T_CL_PAREN)(input)?;
+    Ok((input, Expr::UnitE))
+}

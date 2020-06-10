@@ -41,24 +41,16 @@ pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_FN)(input)?;
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
-    let (input, mut xs) = many1(|input| {
-        let (input, x) = take_ident(input)?;
-        let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-        Ok((input, x))
-    })(input)?;
+    let (input, x) = alt((
+        map(p_unit_arg, |_| String::from("_")),
+        take_ident,
+    ))(input)?;
+    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     let (input, body) = p_expr(input)?;
-    let x_top = xs.remove(0);
-    let xs: Vec<_> = xs.iter().rev().collect();
 
     Ok((
         input,
-        Defn::FnD(
-            name,
-            x_top,
-            xs.into_iter().fold(body, |acc, x| {
-                box Annotated::zero(Expr::FnE(None, x.clone(), acc))
-            }),
-        ),
+        Defn::FnD(name, x, body),
     ))
 }
 

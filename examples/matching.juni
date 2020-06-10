@@ -9,13 +9,13 @@ enum Result {
 }
 
 fn give_this_back :: x => (
-  if (random x) > 0.5 then
+  if (random ()) > 0.5 then
     Some x
   else None
 )
 
 fn make_this_work :: x => (
-  if (random x) > 0.5 then
+  if (random ()) > 0.5 then
     Ok x
   else Err "oops! it didn't work :("
 )
@@ -38,27 +38,13 @@ fn main :: x => (
     };
     print "";
 
-    let r_num = (round ((random 1) * 10)) in (
-      print ("r_num = " + r_num);
-      match r_num {
-        0 => print "zero'th?",
-        1 => print "first",
-        2 => print "second",
-        3 => print "third",
-        4 => print "fourth",
-        5 => print "fifth",
-        x => print ("" + x + ", too many to count")
-      };
-      print "";
-    );
-
     match "abc" {
       "xyz" => print "nope",
       "abc" => print "yep",
     };
     print "";
 
-    let r_num = (round ((random 1) * 10)) in (
+    let r_num = (round ((random ()) * 10)) in (
       print ("r_num = " + r_num);
       match ("r = " + r_num) {
         "r = 0" => print "r is zero'th?",
