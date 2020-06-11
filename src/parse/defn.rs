@@ -25,14 +25,13 @@ use std::rc::Rc;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
     let (input, defs) = many0(annotated_terminal(alt((
-        p_fn_named, p_prim, p_struct, p_enum,
+        p_tl_var, p_prim, p_struct, p_enum,
     ))))(input)?;
 
     Ok((input, defs))
 }
 
-pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
-    let (input, _) = ttag(&T_FN)(input)?;
+pub fn p_tl_var(input: TokenBuffer) -> DefnIResult {
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, (x, t)) = p_fn_arg(input)?;
