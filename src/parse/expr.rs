@@ -310,25 +310,19 @@ pub fn p_while(input: TokenBuffer) -> UnOpIResult {
 }
 
 pub fn p_func_anon(input: TokenBuffer) -> UnOpIResult {
-    let (input, x) = alt((
-        take_ident,
-        map(p_unit_arg, |_| String::from("_"))
-    ))(input)?;
+    let (input, (x, t)) = p_fn_arg(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    Ok((input, box move |body| FnE(None, x.clone(), body)))
+    Ok((input, box move |body| FnE(None, x.clone(), t.clone(), body)))
 }
 
 pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
     let (input, _) = opt(ttag(&T_FN))(input)?;
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
-    let (input, arg) = alt((
-        take_ident,
-        map(p_unit_arg, |_| String::from("_"))
-    ))(input)?;
+    let (input, (arg, t)) = p_fn_arg(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     Ok((input, box move |body| {
-        FnE(Some(name.clone()), arg.clone(), body)
+        FnE(Some(name.clone()), arg.clone(), t.clone(), body)
     }))
 }
 

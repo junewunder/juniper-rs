@@ -22,6 +22,12 @@ mod mixfix;
 mod parse;
 mod typecheck;
 
+use crate::annotate::Annotated;
+use crate::data::Defn;
+use crate::error::TypeError;
+use crate::lex::TokenBuffer;
+use crate::parse::ExprIResult;
+use nom::IResult;
 use clap::Clap;
 use data::*;
 use std::fs;
@@ -37,6 +43,9 @@ struct Opts {
 
     #[clap(long, short("l"))]
     lex: bool,
+
+    #[clap(long, short("t"))]
+    typecheck: bool,
 
     #[clap(long("no-run"))]
     no_run: bool,
@@ -58,6 +67,15 @@ fn main() {
             .map_err(|mut e| println!("{:#?}", e));
     }
 
+    if opts.typecheck {
+        typecheck_from_file(opts.target.clone().as_str())
+            .map(|v| println!("{}", print_tenv(&v)))
+            .map_err(|mut e| {
+                e.loc = Some(opts.target.clone());
+                println!("{}", e)
+            });
+    }
+
     if !opts.no_run {
         interp_from_file(opts.target.as_str())
             .map(|v| println!("{}", v))
@@ -74,14 +92,19 @@ fn interp_from_file(filename: &str) -> interp::InterpResult {
     let filename = String::from(filename);
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
+    // let _ = typecheck::
     interp::interp_program(ast)
 }
 
-use crate::annotate::Annotated;
-use crate::data::Defn;
-use crate::lex::TokenBuffer;
-use crate::parse::ExprIResult;
-use nom::IResult;
+fn typecheck_from_file(filename: &str) -> Result<TEnv, TypeError> {
+    let input = fs::read_to_string(filename).expect("Unable to read file");
+    let input = input.as_ref();
+    let filename = String::from(filename);
+    let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
+    let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
+    typecheck::check_program(ast)
+}
+
 fn parse_from_file(filename: &str) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
     let input = fs::read_to_string(filename).expect("Unable to read file");
     let input = input.as_ref();

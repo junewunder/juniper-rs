@@ -1,0 +1,28 @@
+struct Person {
+  name: string,
+  age: num,
+  fav_food: string,
+  is_cool: bool
+}
+
+enum Option {
+  None,
+  Some(any)
+}
+
+enum List {
+  Root,
+  Cons(any, List)
+}
+
+fn main :: () =>
+  let list = (Cons 3 (Cons 2 (Cons 1 Root))) in
+  let june = Person {
+    name: "June",
+    age: 22,
+    fav_food: "curry",
+    is_cool: true,
+  } in (
+    print list;
+    print june;
+  )

@@ -7,14 +7,14 @@ use std::rc::Rc;
 pub type Env = HashMap<String, Value>;
 pub type TEnv = HashMap<String, Type>;
 type Wrap<T> = Box<Annotated<T>>;
-type StructFields = Vec<String>;
+type StructFields = HashMap<String, Type>;
 
 #[derive(Clone, Debug)]
 pub enum Defn {
-    FnD(String, String, Wrap<Expr>),
+    FnD(String, String, Type, Wrap<Expr>),
     PrimD(String, Vec<String>),
-    StructD(String, Vec<String>),
-    EnumD(String, HashMap<String, Vec<String>>),
+    StructD(String, StructFields),
+    EnumD(String, HashMap<String, Vec<Type>>),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -40,7 +40,7 @@ pub enum Expr {
     VarE(String),
     LetE(String, Wrap<Expr>, Wrap<Expr>),
 
-    FnE(Option<String>, String, Wrap<Expr>),
+    FnE(Option<String>, String, Type, Wrap<Expr>),
     AppE(Wrap<Expr>, Wrap<Expr>),
     AppPrimE(String, Vec<String>),
 
@@ -78,7 +78,7 @@ pub enum Value {
     RefV(Rc<Value>),
     PrimV(String),
     StructV(String, StructFields),
-    ObjectV(Option<String>, HashMap<String, Rc<Value>>),
+    ObjectV(Option<String>, HashMap<String, Value>),
     CloV(Option<String>, String, Wrap<Expr>, Rc<Env>),
     EnumV(String, String, Vec<Value>),
     UnitV,
@@ -86,17 +86,20 @@ pub enum Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    TypeVar(String),
     NumT,
     BoolT,
     StringT,
+    AnyT, // TODO: Remove after type parameterization
+    UnitT,
+    UnknownT,
     MutT(Box<Type>),
     RefT(Box<Type>),
     PrimT,
-    CloT(Option<String>, Box<Type>, Box<Type>),
-    UnitT,
-    AnyT,
-    ObjectT,
-    StructT(String, HashMap<String, Type>),
+    CloT(Box<Type>, Box<Type>),
+    ObjectT(HashMap<String, Type>),
+    StructT(String, StructFields),
+    EnumT(String, HashMap<String, Vec<Type>>),
 }
 
 impl Display for Value {
@@ -143,19 +146,73 @@ impl Display for Value {
     }
 }
 
+impl Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Type::*;
+        match self {
+            NumT => write!(f, "num"),
+            BoolT => write!(f, "bool"),
+            StringT => write!(f, "string"),
+            UnitT => write!(f, "()"),
+            AnyT => write!(f, "any"),
+            TypeVar(name) => write!(f, "{}", name),
+            MutT(m) => write!(f, "mut {}", m),
+            RefT(m) => write!(f, "ref {}", m),
+            // PrimT(p) => write!(f, "<prim {}>", p),
+            CloT(i, o) => {
+                // let arg = if arg == "_" { "()" } else { arg };
+                write!(f, "{} -> {}", i, o)
+            }
+            // ObjectT(name, fields) => {
+            //     let name = name
+            //         .clone()
+            //         .map(|name| name + " ")
+            //         .unwrap_or_else(|| String::new());
+            //     let fields: String = fields
+            //         .iter()
+            //         .map(|(k, v)| format!("  {}: {},", k, v))
+            //         .fold(String::new(), |acc, pair| format!("{}{}\n", acc, pair));
+            //     write!(f, "{}{{\n{}}}", name, fields)
+            // }
+            // EnumT(enum_name, variant, args) => {
+            //     let mut args = args.clone();
+            //     let mut args_str = String::new();
+            //     if args.len() > 0 {
+            //         args_str = format!("{}({}", args_str, args.remove(0));
+            //         args_str = args
+            //             .iter()
+            //             .fold(args_str, |acc, arg| format!("{}, {}", acc, arg));
+            //         args_str += ")".into();
+            //     }
+            //     write!(f, "{}::{}{}", enum_name, variant, args_str)
+            // }
+            x => write!(f, "{:?}", x),
+        }
+    }
+}
+
+pub fn print_tenv(env: &TEnv) -> String {
+    let mut env_str = format!("{{ ");
+    for (k, v) in env.iter() {
+        env_str += &format!("\n    {}: {}, ", k, v)
+    }
+    env_str = env_str.trim_end_matches(", ").into();
+    env_str + "\n}"
+}
+
 pub fn print_env_safe(env: &Rc<Env>) -> String {
     let mut env_str = format!("{{ ");
     for (k, v) in env.iter() {
         match v {
             Value::CloV(_, arg, _, _) if arg == "_" => {
-                env_str = format!("{}{}: <fn ()>, ", env_str, k)
+                env_str += &format!("{}: <fn ()>, ", k)
             }
             Value::CloV(_, arg, _, _) => {
-                env_str = format!("{}{}: <fn {}>, ", env_str, k, arg)
+                env_str += &format!("{}: <fn {}>, ", k, arg)
             }
-            _ => env_str = format!("{}{}: {}, ", env_str, k, v),
+            _ => env_str += &format!("{}: {}, ", k, v),
         }
     }
-    env_str.trim_end_matches(", ");
+    env_str = env_str.trim_end_matches(", ").into();
     format!("{} }}", env_str)
 }

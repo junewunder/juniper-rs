@@ -6,6 +6,8 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 
 ## questions
  - how to do implement no-arg functions like `random`
+ - how to typecheck with mutual recursion??
+ - .....how bad would it be to implement algorithm W....
 
 ## features so far:
 

@@ -34,22 +34,55 @@ pub enum InterpErrorKind {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TypeErrorKind {
-    TempFiller,
+    TempFiller(i32),
     UndefinedError(String),
+    ApplicationError(Type, Type),
     DerefError(Type),
+    MissingFieldError(String),
+    ExtraFieldError(String),
     UnimplementedBehavior,
 }
 
-impl fmt::Display for InterpError {
+#[derive(Debug, Clone)]
+pub enum ParseErrorKind {
+    NomError(NomErrorKind),
+    GenericError
+}
+
+impl fmt::Display for TypeErrorKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         use InterpErrorKind::*;
+        write!(f, "{:?}", self)
+    }
+}
 
-        let err_msg: String = match self.kind.clone() {
-            TypeError => format!("Type Error"),
-            UndefinedError(name) => format!("Undefined variable \"{}\"", name),
-            DerefError(value) => format!("Value cannot be dereferenced \"{}\"", value),
-            x => format!("{:?}", x),
-        };
+impl fmt::Display for InterpErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use InterpErrorKind::*;
+        match self.clone() {
+            TypeError => write!(f, "Type Error"),
+            UndefinedError(name) => write!(f, "Undefined variable \"{}\"", name),
+            DerefError(value) => write!(f, "Value cannot be dereferenced \"{}\"", value),
+            x => write!(f, "{:?}", x),
+        }
+    }
+}
+
+impl fmt::Display for ParseErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.clone() {
+            ParseErrorKind::NomError(e) => write!(f, "nom error: {:?}", e),
+            ParseErrorKind::GenericError => write!(f, "generic error"),
+            x => write!(f, "{:?}", x),
+        }
+    }
+}
+
+impl<T: fmt::Display + Clone> fmt::Display for AnnotatedError<T> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use ParseErrorKind::*;
+
+        let err_msg = format!("{}", self.kind.clone());
 
         match self.loc.clone() {
             Some(loc) => {
@@ -71,32 +104,10 @@ impl error::Error for InterpError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ParseErrorKind {
-    NomError(NomErrorKind),
-    GenericError
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        use ParseErrorKind::*;
-
-        let err_msg: String = match self.kind.clone() {
-            ParseErrorKind::NomError(e) => format!("nom error: {:?}", e),
-            ParseErrorKind::GenericError => format!("generic error"),
-            x => format!("{:?}", x),
-        };
-
-        match self.loc.clone() {
-            Some(loc) => {
-                let contents = fs::read_to_string(loc.as_str())
-                    .expect(&format!("Unable to read file \"{}\"", loc));
-                let line = calc_line(&self, &contents);
-                let snippet = display_from_file(&contents, self.idx, self.len, line);
-                write!(f, "{} at line {}\n{}", err_msg, line, snippet)
-            }
-            None => write!(f, "{} in <unknown file>", err_msg),
-        }
+impl error::Error for TypeError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        // Generic error, underlying cause isn't tracked.
+        None
     }
 }
 
@@ -135,17 +146,19 @@ fn calc_line<T>(err: &AnnotatedError<T>, contents: &String) -> usize {
     let mut curr_pos = 0;
     let mut line_num = 0;
     while curr_pos < err.idx {
-        line_num += 1;
-        curr_pos += lines
-            .get(line_num - 1)
-            .expect(idx_out_of_bounds.as_ref())
-            .len();
+        match lines.get(line_num) {
+            Some(line) => {
+                curr_pos += line.len();
+                line_num += 1;
+            }
+            None => break
+        }
     }
     line_num
 }
 
 fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize) -> String {
-    let mut line_num = line_num - 1;
+    let mut line_num = line_num;
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
     let contents =
@@ -154,14 +167,10 @@ fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize)
         .lines()
         .map(|line| {
             line_num += 1;
-            format!("{:?}.\t{}\n", line_num, line)
+            format!("{:?}.\t{}\n", line_num - 1, line)
         })
         .collect::<String>()
         .trim_end_matches('\n')
         .to_owned();
-    // TODO: This doesn't fix display from file problem for some reason
-    // let start = idx.min(contents.len() - 1);
-    // let end = (idx + len).min(contents.len() - 1);
-    // let contents = &contents[start..end];
     contents
 }

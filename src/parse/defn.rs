@@ -1,11 +1,11 @@
 use crate::annotate::*;
-use crate::data::{Defn, Expr};
+use crate::data::{Defn, Expr, Type};
 use crate::lex::{
     self, take_ident, ttag,
     Token::{self, *},
     TokenBuffer,
 };
-use crate::parse::{expr::p_expr, shared::*};
+use crate::parse::{expr::p_expr, shared::*, types::p_type};
 use core::fmt::Error;
 use nom::{
     self,
@@ -31,26 +31,17 @@ pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn
     Ok((input, defs))
 }
 
-// pub fn p_type(input: TokenBuffer) ->
-// pub fn p_type(input: TokenBuffer) -> TypeIResult {
-//     let (input, x) = take_ident(input)?;
-//     Ok((input, VarE(x)))
-// }
-
 pub fn p_fn_named(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_FN)(input)?;
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
-    let (input, x) = alt((
-        map(p_unit_arg, |_| String::from("_")),
-        take_ident,
-    ))(input)?;
+    let (input, (x, t)) = p_fn_arg(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
     let (input, body) = p_expr(input)?;
 
     Ok((
         input,
-        Defn::FnD(name, x, body),
+        Defn::FnD(name, x, t, body),
     ))
 }
 
@@ -67,11 +58,11 @@ pub fn p_struct(input: TokenBuffer) -> DefnIResult {
     let (input, _) = ttag(&T_STRUCT)(input)?;
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_OP_BRACE)(input)?;
-    let (input, fields) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
+    let (input, fields) = separated_list(ttag(&T_COMMA), p_var_type_pair)(input)?;
     let (input, _) = opt(ttag(&T_COMMA))(input)?;
     let (input, _) = ttag(&T_CL_BRACE)(input)?;
 
-    Ok((input, Defn::StructD(name, fields)))
+    Ok((input, Defn::StructD(name, fields.into())))
 }
 
 pub fn p_enum(input: TokenBuffer) -> DefnIResult {
@@ -85,15 +76,15 @@ pub fn p_enum(input: TokenBuffer) -> DefnIResult {
     Ok((input, Defn::EnumD(name, variants.into())))
 }
 
-fn p_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<String>)> {
+fn p_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<Type>)> {
     let (input, name) = take_ident(input)?;
-    let (input, variants) = opt(|input| {
+    let (input, ts) = opt(|input| {
         let (input, _) = ttag(&T_OP_PAREN)(input)?;
-        let (input, variants) = separated_list(ttag(&T_COMMA), take_ident)(input)?;
+        let (input, ts): (_, Vec<Type>) = separated_list(ttag(&T_COMMA), p_type)(input)?;
         let (input, _) = opt(ttag(&T_COMMA))(input)?;
         let (input, _) = ttag(&T_CL_PAREN)(input)?;
-        Ok((input, variants))
+        Ok((input, ts))
     })(input)?;
 
-    Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
+    Ok((input, (name, ts.unwrap_or(Vec::with_capacity(0)))))
 }

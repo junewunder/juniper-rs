@@ -1,28 +1,28 @@
 enum Nat {
-  Suc(n),
+  Suc(Nat),
   Zero,
 }
 
-fn is_even :: n => match n {
+fn is_even :: n: Nat => match n {
   ::Zero => true,
   ::Suc(::Zero) => false,
   ::Suc(::Suc(n)) => is_even(n),
 }
 
-fn is_odd :: n => match n {
+fn is_odd :: n: Nat => match n {
   ::Zero => false,
   ::Suc(::Zero) => true,
   ::Suc(::Suc(n)) => is_odd(n),
 }
 
-fn to_nat :: n => (
+fn to_nat :: n: num => (
   if n > 0 then
     Suc (to_nat (n - 1))
   else
     Zero
 )
 
-fn main :: x => (
+fn main :: () => (
   mut i = 0 in
   while (*i) < 10 => (
     let n = to_nat (*i) in
