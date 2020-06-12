@@ -8,7 +8,7 @@ is_even n = {
   match n {
     ::Zero => true,
     ::Suc(::Zero) => false,
-    ::Suc(::Suc(n)) => is_even(n),
+    ::Suc(::Suc(n)) => is_even n,
   }
 }
 

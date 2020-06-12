@@ -6,14 +6,14 @@ addOne n = {
 main : () -> any
 main () = {
   mut i = 0 in
-  mut numbers = "1..10 = " in (
+  mut seq = "1..10 = " in (
     while (*i) < 10 => (
       print "looping";
       addOne i;
-      #!numbers = (*numbers) + (if (*i) > 1 then ", " else "") + (*i);
+      !seq = (*seq) + (if (*i) > 1 then ", " else "") + (*i);
       print ("i = " + i);
       delay 100
     );
-    numbers
+    seq
   )
 }
