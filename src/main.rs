@@ -57,6 +57,9 @@ fn main() {
     println!("{:?}", parse_type("num"));
     println!("{:?}", parse_type("A"));
     println!("{:?}", parse_type("A -> B"));
+    println!("{:?}", parse_type("A -> B -> C"));
+    println!("{:?}", parse_type("A -> (B -> C) -> D"));
+    println!("{:?}", parse_type("A -> (B -> C) -> D -> E -> (F -> G -> H)"));
 
     if opts.lex {
         let input = fs::read_to_string(opts.target.as_str()).expect("Unable to read file");

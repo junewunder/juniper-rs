@@ -68,6 +68,6 @@ fn p_mut(input: TokenBuffer) -> TypeIResult {
 fn p_fn(input: TokenBuffer) -> TypeIResult {
     let (input, i) = p_terminal(input)?;
     let (input, _) = ttag(&T_THIN_ARROW_R)(input)?;
-    let (input, o) = p_terminal(input)?;
+    let (input, o) = p_type(input)?;
     Ok((input, Type::CloT(Box::new(i), Box::new(o))))
 }
