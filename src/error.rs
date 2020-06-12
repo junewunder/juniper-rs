@@ -40,6 +40,7 @@ pub enum TypeErrorKind {
     DerefError(Type),
     MissingFieldError(String),
     ExtraFieldError(String),
+    UnexpectedTypeError(/*expected*/Type, /*actual*/ Type),
     UnimplementedBehavior,
 }
 

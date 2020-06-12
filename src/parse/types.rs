@@ -25,25 +25,49 @@ use std::rc::Rc;
 
 pub fn p_type(input: TokenBuffer) -> TypeIResult {
     alt((
+        p_fn,
+        p_terminal,
+    ))(input)
+}
+
+pub fn p_terminal(input: TokenBuffer) -> TypeIResult {
+    alt((
         map(ttag(&T_TY_NUM), |_| Type::NumT),
         map(ttag(&T_TY_BOOL), |_| Type::BoolT),
         map(ttag(&T_TY_ANY), |_| Type::AnyT),
         map(ttag(&T_TY_UNIT), |_| Type::UnitT),
         map(ttag(&T_TY_STRING), |_| Type::StringT),
         map(take_ident, |x| Type::TypeVar(x)),
+        p_unit,
+        p_parens,
         p_mut,
-        // p_fn,
     ))(input)
+}
+
+fn p_unit(input: TokenBuffer) -> TypeIResult {
+    let (input, _) = ttag(&T_OP_PAREN)(input)?;
+    let (input, _) = ttag(&T_CL_PAREN)(input)?;
+    Ok((input, Type::UnitT))
+}
+
+
+fn p_parens(input: TokenBuffer) -> TypeIResult {
+    let (input, _) = ttag(&T_OP_PAREN)(input)?;
+    let (input, t) = p_type(input)?;
+    let (input, _) = ttag(&T_CL_PAREN)(input)?;
+    Ok((input, t))
 }
 
 fn p_mut(input: TokenBuffer) -> TypeIResult {
     let (input, _) = ttag(&T_MUT)(input)?;
-    let (input, t) = p_type(input)?;
+    let (input, t) = p_terminal(input)?;
     Ok((input, Type::MutT(Box::new(t))))
 }
 
-// fn p_fn(input: TokenBuffer) -> TypeIResult {
-//     let (input, _) = ttag(&T_FN)(input)?;
-//     let (input, t) = p_type(input)?;
-//     Ok((input, Type::MutT(Box::new(t))))
-// }
+// TODO this isn't the mooost effecient but it works
+fn p_fn(input: TokenBuffer) -> TypeIResult {
+    let (input, i) = p_terminal(input)?;
+    let (input, _) = ttag(&T_THIN_ARROW_R)(input)?;
+    let (input, o) = p_terminal(input)?;
+    Ok((input, Type::CloT(Box::new(i), Box::new(o))))
+}

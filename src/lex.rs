@@ -128,6 +128,7 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
         map(
             alt((
                 tag("=>"),
+                tag("->"),
                 tag("&&"),
                 tag("||"),
                 tag("=="),

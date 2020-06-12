@@ -16,7 +16,7 @@ extern crate rand;
 mod annotate;
 mod data;
 mod error;
-mod interp;
+// mod interp;
 mod lex;
 mod mixfix;
 mod parse;
@@ -54,6 +54,10 @@ struct Opts {
 fn main() {
     let opts: Opts = Opts::parse();
 
+    println!("{:?}", parse_type("num"));
+    println!("{:?}", parse_type("A"));
+    println!("{:?}", parse_type("A -> B"));
+
     if opts.lex {
         let input = fs::read_to_string(opts.target.as_str()).expect("Unable to read file");
         lex::lex(input.clone().as_str())
@@ -76,25 +80,25 @@ fn main() {
             });
     }
 
-    if !opts.no_run {
-        interp_from_file(opts.target.as_str())
-            .map(|v| println!("{}", v))
-            .map_err(|mut e| {
-                e.loc = Some(opts.target);
-                println!("{}", e)
-            });
-    }
+    // if !opts.no_run {
+    //     interp_from_file(opts.target.as_str())
+    //         .map(|v| println!("{}", v))
+    //         .map_err(|mut e| {
+    //             e.loc = Some(opts.target);
+    //             println!("{}", e)
+    //         });
+    // }
 }
 
-fn interp_from_file(filename: &str) -> interp::InterpResult {
-    let input = fs::read_to_string(filename).expect("Unable to read file");
-    let input = input.as_ref();
-    let filename = String::from(filename);
-    let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
-    let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
-    // let _ = typecheck::
-    interp::interp_program(ast)
-}
+// fn interp_from_file(filename: &str) -> interp::InterpResult {
+//     let input = fs::read_to_string(filename).expect("Unable to read file");
+//     let input = input.as_ref();
+//     let filename = String::from(filename);
+//     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
+//     let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
+//     // let _ = typecheck::
+//     interp::interp_program(ast)
+// }
 
 fn typecheck_from_file(filename: &str) -> Result<TEnv, TypeError> {
     let input = fs::read_to_string(filename).expect("Unable to read file");
@@ -117,11 +121,11 @@ fn parse_from_file(filename: &str) -> IResult<TokenBuffer, Vec<Box<Annotated<Def
 //
 // }
 
-fn interp_expr(input: &str, env: &Env) -> interp::InterpResult {
-    let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
-    let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
-    interp::interp_expr(ast, env)
-}
+// fn interp_expr(input: &str, env: &Env) -> interp::InterpResult {
+//     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
+//     let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
+//     interp::interp_expr(ast, env)
+// }
 
 fn parse_expr(input: &str) -> Box<annotate::Annotated<Expr>> {
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
@@ -129,8 +133,10 @@ fn parse_expr(input: &str) -> Box<annotate::Annotated<Expr>> {
     ast
 }
 
-fn lex_expr(input: &str) -> IResult<&str, TokenBuffer> {
-    lex::lex(input)
+fn parse_type(input: &str) -> Type {
+    let (r, tokbuf) = lex::lex(input).expect("type failed lexing");
+    let (r, ast) = parse::p_type(tokbuf).expect("type failed parsing");
+    ast
 }
 
 // Some random expressions for manual testing

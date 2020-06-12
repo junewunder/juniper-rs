@@ -1,27 +1,12 @@
 use crate::annotate::*;
 use crate::data::{Defn, Expr, Type};
-use crate::lex::{
-    self, take_ident, ttag,
-    Token::{self, *},
-    TokenBuffer,
-};
+use crate::lex::{take_ident, ttag, TokenBuffer};
 use crate::parse::{expr::p_expr, shared::*, types::p_type};
-use core::fmt::Error;
 use nom::{
-    self,
-    branch::alt,
-    bytes::complete::take_until,
-    character::complete::{alpha1, char, space0, space1},
-    combinator::{complete, not, peek},
-    combinator::{map, opt},
-    error::{ErrorKind, ParseError},
-    multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
-    sequence::delimited,
-    sequence::pair,
-    Err, IResult,
+    self, IResult,
+    branch::alt, combinator::{map, opt},
+    multi::{many0, separated_list, separated_nonempty_list},
 };
-use std::collections::HashMap;
-use std::rc::Rc;
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
     let (input, defs) = many0(annotated_terminal(alt((
@@ -34,14 +19,22 @@ pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn
 pub fn p_tl_var(input: TokenBuffer) -> DefnIResult {
     let (input, name) = take_ident(input)?;
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
-    let (input, (x, t)) = p_fn_arg(input)?;
-    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
+    let (input, ty) = p_type(input)?;
+    let (input, _) = take_ident(input)?; //TODO make sure this is the same as name
+    let (input, args) = many0(p_fn_arg)(input)?;
+    let (input, _) = ttag(&T_EQ)(input)?;
+    let (input, _) = ttag(&T_OP_BRACE)(input)?;
     let (input, body) = p_expr(input)?;
+    let (input, _) = ttag(&T_CL_BRACE)(input)?;
 
-    Ok((
-        input,
-        Defn::FnD(name, x, t, body),
-    ))
+    Ok((input, Defn::VarD(name, args, ty, body)))
+}
+
+fn p_fn_arg(input: TokenBuffer) -> IResult<TokenBuffer, String> {
+    alt((
+        map(p_unit_arg, |_| String::from("_")),
+        take_ident,
+    ))(input)
 }
 
 pub fn p_prim(input: TokenBuffer) -> DefnIResult {

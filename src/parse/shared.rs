@@ -32,6 +32,7 @@ lazy_static! {
     pub static ref T_MATCH: Token          = Keywd("match".into());
     pub static ref T_EQ: Token             = Op("=".into());
     pub static ref T_FAT_ARROW_R: Token    = Op("=>".into());
+    pub static ref T_THIN_ARROW_R: Token   = Op("->".into());
     pub static ref T_ADD: Token            = Op("+".into());
     pub static ref T_SUB: Token            = Op("-".into());
     pub static ref T_MULT: Token           = Op("*".into());
@@ -78,12 +79,4 @@ pub fn p_var_type_pair(input: TokenBuffer) -> IResult<TokenBuffer, (String, Type
     let (input, _) = ttag(&T_COLON)(input)?;
     let (input, t) = p_type(input)?;
     Ok((input, (x, t)))
-}
-
-use nom::{branch::alt, combinator::map};
-pub fn p_fn_arg(input: TokenBuffer) -> IResult<TokenBuffer, (String, Type)> {
-    alt((
-        map(p_unit_arg, |_| (String::from("_"), Type::UnitT)),
-        p_var_type_pair,
-    ))(input)
 }

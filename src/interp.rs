@@ -5,7 +5,7 @@ use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type DefFnEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
+type DefVarEnv = HashMap<String, Box<Annotated<Expr>>>;
 pub type InterpResult = std::result::Result<Value, InterpError>;
 
 pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
@@ -23,8 +23,8 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     let env_cell = RefCell::new(env);
     let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
 
-    let denv: DefFnEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
-    for (name, (arg, body)) in denv.into_iter() {
+    let denv: DefVarEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
+    for (name, body) in denv.into_iter() {
         env_cell.borrow_mut().insert(
             name.clone(),
             Value::CloV(Some(name), arg, body, env_rc.clone()),
@@ -39,10 +39,11 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     panic!("no <main> method")
 }
 
-fn interp_fn_defs(denv: DefFnEnv, def: Box<Annotated<Defn>>) -> DefFnEnv {
+fn interp_fn_defs(denv: DefVarEnv, def: Box<Annotated<Defn>>) -> DefVarEnv {
     use Defn::*;
     match def.unwrap() {
-        FnD(name, x, _, expr) => denv.update(name, (x, expr)),
+        // TODO MAKE THIS RIGHT ADD FUNCTION WRAPPERS THAT ACTUALLY TAKE THE ARGUMENTS
+        Defn::VarD(name, args, rt, body) => denv.update(name, body),
         _ => denv,
     }
 }

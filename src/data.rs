@@ -11,7 +11,7 @@ type StructFields = HashMap<String, Type>;
 
 #[derive(Clone, Debug)]
 pub enum Defn {
-    FnD(String, String, Type, Wrap<Expr>),
+    VarD(String, Vec<String>, Type, Wrap<Expr>),
     PrimD(String, Vec<String>),
     StructD(String, StructFields),
     EnumD(String, HashMap<String, Vec<Type>>),
@@ -158,38 +158,73 @@ impl Display for Type {
             TypeVar(name) => write!(f, "{}", name),
             MutT(m) => write!(f, "mut {}", m),
             RefT(m) => write!(f, "ref {}", m),
-            // PrimT(p) => write!(f, "<prim {}>", p),
             CloT(i, o) => {
-                // let arg = if arg == "_" { "()" } else { arg };
                 write!(f, "{} -> {}", i, o)
             }
-            // ObjectT(name, fields) => {
-            //     let name = name
-            //         .clone()
-            //         .map(|name| name + " ")
-            //         .unwrap_or_else(|| String::new());
-            //     let fields: String = fields
-            //         .iter()
-            //         .map(|(k, v)| format!("  {}: {},", k, v))
-            //         .fold(String::new(), |acc, pair| format!("{}{}\n", acc, pair));
-            //     write!(f, "{}{{\n{}}}", name, fields)
-            // }
-            // EnumT(enum_name, variant, args) => {
-            //     let mut args = args.clone();
-            //     let mut args_str = String::new();
-            //     if args.len() > 0 {
-            //         args_str = format!("{}({}", args_str, args.remove(0));
-            //         args_str = args
-            //             .iter()
-            //             .fold(args_str, |acc, arg| format!("{}, {}", acc, arg));
-            //         args_str += ")".into();
-            //     }
-            //     write!(f, "{}::{}{}", enum_name, variant, args_str)
-            // }
             x => write!(f, "{:?}", x),
         }
     }
 }
+
+impl IntoIterator for Type {
+    type Item = Type;
+    type IntoIter = TypeIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        TypeIterator{ cur: Some(self) }
+    }
+}
+
+impl std::iter::FromIterator<Type> for Type {
+    fn from_iter<T>(iter: T) -> Self
+        where T: IntoIterator<Item = Type>
+    {
+        let mut out: Option<Type> = None;
+
+        for next in iter {
+            match out {
+                Some(cur) => out = Some(Type::CloT(Box::new(cur), Box::new(next))),
+                None => out = Some(next)
+            }
+        }
+        out.unwrap_or(Type::UnitT)
+    }
+}
+
+pub struct TypeIterator {
+    cur: Option<Type>
+}
+
+impl Iterator for TypeIterator {
+    type Item = Type;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.cur.clone() {
+            Some(Type::CloT(t, rt)) => {
+                self.cur = Some(*rt.clone());
+                Some(*t)
+            }
+            Some(t) => {
+                self.cur = None;
+                Some(t)
+            }
+            None => None,
+        }
+    }
+}
+
+// impl Type {
+//     pub fn to_vec(&self) -> Vec<Type> {
+//         match self {
+//             Type::CloT(t, rt) => {
+//                 let out = Vec::new();
+//                 out.push(*t.clone());
+//                 out.append(&mut rt.to_vec());
+//                 out
+//             },
+//             _ => Vec::
+//         }
+//     }
+// }
 
 pub fn print_tenv(env: &TEnv) -> String {
     let mut env_str = format!("{{ ");

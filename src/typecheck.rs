@@ -19,19 +19,12 @@ pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError>
     .collect();
     // let env = defs.iter().fold(env, init_type_in_scope)
     let env = defs.iter().fold(env, check_data_defs);
-    let env = defs.iter().try_fold(env, check_fn_defs);
+    // let _ = defs.iter().map(env, );
+    for def in defs {
+        check_var_defs(&env, &def)?
+    };
 
-    // let env_cell = RefCell::new(env);
-    // let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
-    //
-    // let denv: DefFnEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
-    // for (name, (arg, body)) in denv.into_iter() {
-    //     env_cell.borrow_mut().insert(
-    //         name.clone(),
-    //         Value::CloV(Some(name), arg, body, env_rc.clone()),
-    //     );
-    // }
-    env
+    Ok(env)
 }
 
 // fn simplify(env: &TEnv, t: &Type) -> Type {
@@ -78,20 +71,35 @@ fn check_data_defs(env: TEnv, def: &Box<Annotated<Defn>>) -> TEnv {
                     .collect()
             )
         },
+        Defn::VarD(name, _, rt, _) => env.update(name.clone(), rt.clone()),
         // Defn::PrimD(name, mut xs) => env.update(name, v)
         _ => env
     }
 }
 
-fn check_fn_defs(env: TEnv, def: &Box<Annotated<Defn>>) -> Result<TEnv, TypeError> {
+fn check_var_defs(env: &TEnv, def: &Box<Annotated<Defn>>) -> Result<(), TypeError> {
     use Defn::*;
     match def.clone().unwrap() {
-        FnD(name, x, t, body) => {
-            let t_body = check_expr(body, &env.update(x, t.clone()))?;
-            Ok(env.update(name, Type::CloT(Box::new(t), Box::new(t_body))))
+        Defn::VarD(name, args, rt, body) => {
+            let arg_ts = rt.clone().into_iter().take(args.len());
+            let env_body = args.iter()
+                .zip(arg_ts)
+                .fold(env.clone(), |env, (x, t)| env.update(x.clone(), t));
+
+            let t_expected = rt.into_iter().skip(args.len()).collect();
+            let t_body = check_expr(body, &env_body)?;
+            if !equiv(&env, &t_body, &t_expected) {
+                return Err(TypeError {
+                    kind: TypeErrorKind::UnexpectedTypeError(t_expected, t_body),
+                    idx: def.idx,
+                    len: def.len,
+                    loc: None,
+                })
+            }
         },
-        _ => Ok(env),
-    }
+        _ => ()
+    };
+    Ok(())
 }
 
 pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
