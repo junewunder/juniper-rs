@@ -1,2 +1,2 @@
-fn main :: x =>
+fn main : x =>
   1 + true

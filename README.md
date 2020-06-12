@@ -6,6 +6,8 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 
 ## questions
  - how to do implement no-arg functions like `random`
+ - how to typecheck with mutual recursion??
+ - .....how bad would it be to implement algorithm W....
 
 ## features so far:
 
@@ -25,7 +27,7 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - REPL functionality
  - parse values from command line to main function
  - detect when mut value is trying to be used without being dereferenced
- - use Weak reference counting in CloV
- - strange out-of-bounds error when interp error is found on last line of file
+ - use Weak reference counting in CloV?
  - mutable struct values
- - optional typing in struct values
+ - bug: variable names that conatain keywords can't be parsed
+ - scoped types?

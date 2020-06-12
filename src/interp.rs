@@ -19,11 +19,10 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     .collect();
 
     let env = defs.iter().fold(env, interp_scopeless_defs);
-
     let env_cell = RefCell::new(env);
     let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
+    let denv: DefFnEnv = defs.iter().fold(HashMap::new(), interp_fn_defs);
 
-    let denv: DefFnEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
     for (name, (arg, body)) in denv.into_iter() {
         env_cell.borrow_mut().insert(
             name.clone(),
@@ -31,7 +30,13 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
         );
     }
 
-    // println!("{}", print_env_safe(&env_rc));
+    for def in defs.iter() {
+        if let Some((name, value)) = interp_val_def(def, &env_rc) {
+            env_cell.borrow_mut().insert(name, value?);
+        }
+    }
+
+    println!("{}", print_env(&env_rc));
     if let Some(Value::CloV(_, arg, body, env)) = env_rc.get("main".into()) {
         return interp_expr(body.clone(), &env);
     }
@@ -39,11 +44,27 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     panic!("no <main> method")
 }
 
-fn interp_fn_defs(denv: DefFnEnv, def: Box<Annotated<Defn>>) -> DefFnEnv {
-    use Defn::*;
-    match def.unwrap() {
-        FnD(name, x, expr) => denv.update(name, (x, expr)),
+fn interp_fn_defs(denv: DefFnEnv, def: &Box<Annotated<Defn>>) -> DefFnEnv {
+    match def.clone().unwrap() {
+        Defn::VarD(name, xs, rt, body) if xs.len() > 0 => {
+            let mut xt_s = xs.iter().zip(rt.clone().into_iter().collect::<Vec<_>>());
+            let (x, t) = xt_s.next().unwrap();
+            let e = xt_s.rev().fold(body, |acc, (x, t)| {
+                let next = Expr::FnE(None, x.clone(), t.clone(), acc);
+                Box::new(Annotated::zero(next))
+            });
+            denv.update(name, (x.clone(), e))
+        },
         _ => denv,
+    }
+}
+
+fn interp_val_def(def: &Box<Annotated<Defn>>, env: &Env) -> Option<(String, InterpResult)> {
+    match def.clone().unwrap() {
+        Defn::VarD(name, xs, rt, body) if xs.len() == 0 => {
+            Some((name, interp_expr(body, env)))
+        },
+        _ => None,
     }
 }
 
@@ -54,28 +75,32 @@ fn interp_scopeless_defs(env: Env, def: &Box<Annotated<Defn>>) -> Env {
         StructD(name, fields) => {
             env.update(name.clone(), Value::StructV(name.clone(), fields.clone()))
         }
-        PrimD(name, mut xs) => {
-            let app = box Expr::AppPrimE(name.clone(), xs.clone());
-            let arg0 = xs.remove(0);
-            let body = xs.iter().fold(box Annotated::zero(*app), |acc, x| {
-                box Annotated::zero(Expr::FnE(None, x.into(), acc))
-            });
-            env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
-        }
-        EnumD(enum_name, variants) => variants.iter().fold(env, |env, (name, xs)| {
-            if xs.len() == 0 {
+        // PrimD(name, mut xs) => {
+        //     let app = box Expr::AppPrimE(name.clone(), xs.clone());
+        //     let arg0 = xs.remove(0);
+        //     let body = xs.iter().fold(box Annotated::zero(*app), |acc, x| {
+        //         box Annotated::zero(Expr::FnE(None, x.into(), acc))
+        //     });
+        //     env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
+        // }
+        Defn::EnumD(enum_name, variants) => variants.iter().fold(env, |env, (name, ts)| {
+            if ts.len() == 0 {
                 return env.update(
                     name.clone(),
                     Value::EnumV(enum_name.clone(), name.clone(), Vec::with_capacity(0)),
                 );
             }
-            let mut xs = xs.clone();
+            let mut xs = ts.clone().iter()
+                .enumerate()
+                .map(|(i, x)| format!("{}{}", x, i))
+                .collect::<Vec<String>>();
             let init_enum_var = Expr::InitEnumVariantE(enum_name.clone(), name.clone(), xs.clone());
             let arg0 = xs.remove(0);
             let body = xs
                 .iter()
-                .fold(box Annotated::zero(init_enum_var), |acc, x| {
-                    box Annotated::zero(Expr::FnE(None, x.into(), acc))
+                .zip(ts)
+                .fold(box Annotated::zero(init_enum_var), |acc, (x, t)| {
+                    box Annotated::zero(Expr::FnE(None, x.clone(), t.clone(), acc))
                 });
             env.update(
                 name.clone(),
@@ -200,7 +225,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             interp(e1, env)?;
             interp(e2, env)
         }
-        Expr::FnE(name, x, body) => match name {
+        Expr::FnE(name, x, t, body) => match name {
             Some(name) => {
                 let env_cell = RefCell::new(env.clone());
                 let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
@@ -237,28 +262,29 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
         Expr::InitObjectE(fields) => {
             let mut field_vs = HashMap::new();
             for (x, e) in fields.into_iter() {
-                field_vs.insert(x, Rc::new(interp(e, env)?));
+                field_vs.insert(x, interp(e, env)?);
             }
 
             Ok(ObjectV(None, field_vs))
         }
         Expr::InitStructE(name, fields) => {
+            // TODO: simplify now that this is being checked for in type system
             let allowed_fields = match env.get(&name) {
                 Some(StructV(name, fields)) => fields,
                 _ => return err!(UndefinedError(name)),
             };
             let mut field_vs = HashMap::new();
             for (x, e) in fields.into_iter() {
-                if !allowed_fields.contains(&x) {
+                if !allowed_fields.contains_key(&x) {
                     return err!(ExtraFieldError(x));
                 }
-                field_vs.insert(x, Rc::new(interp(e, env)?));
+                field_vs.insert(x, interp(e, env)?);
             }
 
             let keys: Vec<&String> = field_vs.keys().collect();
             for x in allowed_fields.iter() {
-                if !keys.contains(&x) {
-                    return err!(MissingFieldError(x.clone()));
+                if !keys.contains(&x.0) {
+                    return err!(MissingFieldError(x.0.clone()));
                 }
             }
 
@@ -282,7 +308,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
                 _ => return err!(TypeError),
             };
 
-            Ok(RefV(v))
+            Ok(v.clone()) // previously: Ok(RefV(v))
         }
         Expr::MatchE(subject, patterns) => {
             use MatchPattern::*;

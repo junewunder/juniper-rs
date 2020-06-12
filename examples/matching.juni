@@ -8,33 +8,33 @@ enum Result {
   Err(error)
 }
 
-fn give_this_back :: x => (
+fn give_this_back : x => (
   if (random ()) > 0.5 then
     Some x
   else None
 )
 
-fn make_this_work :: x => (
+fn make_this_work : x => (
   if (random ()) > 0.5 then
     Ok x
   else Err "oops! it didn't work :("
 )
 
-fn main :: x => (
+fn main : x => (
   let test_value = 42 in (
 
     print ("test_value = " + test_value);
     print "";
 
     match give_this_back test_value {
-      ::Some(x) => print ("thanks for giving me back " + x),
+      Some(x) => print ("thanks for giving me back " + x),
       ::None => print "oh no, you didn't give it back :(",
     };
     print "";
 
     match make_this_work test_value {
-      ::Ok(x) => print ("yay, " + x + " worked!"),
-      ::Err(e) => print ("Q: why didn't it work? A: " + e),
+      Ok(x) => print ("yay, " + x + " worked!"),
+      Err(e) => print ("Q: why didn't it work? A: " + e),
     };
     print "";
 

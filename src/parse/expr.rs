@@ -1,28 +1,20 @@
 use crate::annotate::*;
-use crate::data::Expr::{self, *};
+use crate::data::{Type, Expr::{self, *}};
 use crate::lex::{
-    self, take_ident, ttag,
-    Token::{self, *},
+    take_ident, ttag,
+    Token::*,
     TokenBuffer,
 };
-use crate::mixfix::{
-    combinator::{bin_op, un_op},
-    mixfix::*,
-};
+use crate::mixfix::mixfix::*;
 use crate::parse::shared::*;
 use crate::error::{AnnotatedError, ParseError, ParseErrorKind};
-use core::fmt::Error;
 use nom::{
     self,
     branch::alt,
-    bytes::complete::take_until,
-    character::complete::{alpha1, char, space0, space1},
     combinator::map,
-    combinator::{complete, not, opt, peek},
+    combinator::{opt, peek},
     error::{ErrorKind as NomErrorKind, ParseError as NomParseError},
-    multi::{fold_many0, many0, many1, separated_list, separated_nonempty_list},
-    sequence::delimited,
-    sequence::pair,
+    multi::{separated_list, separated_nonempty_list},
     Err, IResult,
 };
 use std::collections::HashMap;
@@ -69,7 +61,8 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
         }
     });
 
-    new_op!(P_LAM { prefix: anno_prefix_parser(alt((p_func_named, p_func_anon))) });
+    // new_op!(P_LAM { prefix: anno_prefix_parser(alt((p_func_named, p_func_anon))) });
+    new_op!(P_LAM { prefix: anno_prefix_parser(p_func_anon) });
 
     new_op!(P_LET { prefix: anno_prefix_parser(alt((p_let, p_if, p_while, p_mutable, p_mutate))) });
 
@@ -124,7 +117,7 @@ pub fn p_expr(input: TokenBuffer) -> IResult<TokenBuffer, Box<Annotated<Expr>>> 
     }
 }
 
-fn p_terminals(input: TokenBuffer) -> ExprIResult {
+pub fn p_terminals(input: TokenBuffer) -> ExprIResult {
     alt((
         p_unit,
         p_num,
@@ -223,39 +216,35 @@ fn p_match_case(input: TokenBuffer) -> IResult<TokenBuffer, (MatchPattern, Box<A
 fn p_match_pattern(input: TokenBuffer) -> IResult<TokenBuffer, MatchPattern> {
     use MatchPattern::*;
     alt((
-        map(p_match_enum_field, |(variant, args)| {
-            VariantPat(variant, args)
-        }),
+        map(p_match_enum_variant, |(variant, args)| VariantPat(variant, args)),
+        map(match_noarg_enum, |(variant, args)| VariantPat(variant, args)),
         map(take_ident, |x| AnyPat(x)),
         map(p_string, |x| {
             if let Expr::StringE(s) = x {
                 StringPat(s)
-            } else {
-                panic!()
-            }
+            } else { panic!() }
         }),
         map(p_num, |x| {
             if let Expr::NumE(n) = x {
                 NumPat(n)
-            } else {
-                panic!()
-            }
+            } else { panic!() }
         }),
     ))(input)
 }
 
-fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
+fn match_noarg_enum(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, name) = take_ident(input)?;
-    let (input, variants) = opt(|input| {
-        let (input, _) = ttag(&T_OP_PAREN)(input)?;
-        let (input, variants) = separated_list(ttag(&T_COMMA), p_match_pattern)(input)?;
-        let (input, _) = opt(ttag(&T_COMMA))(input)?;
-        let (input, _) = ttag(&T_CL_PAREN)(input)?;
-        Ok((input, variants))
-    })(input)?;
+    Ok((input, (name, Vec::with_capacity(0))))
+}
 
-    Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
+fn p_match_enum_variant(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_OP_PAREN)(input)?;
+    let (input, variants) = separated_list(ttag(&T_COMMA), p_match_pattern)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_PAREN)(input)?;
+    Ok((input, (name, variants)))
 }
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
@@ -309,28 +298,29 @@ pub fn p_while(input: TokenBuffer) -> UnOpIResult {
     Ok((input, box move |body| WhileE(pred.clone(), body.clone())))
 }
 
-pub fn p_func_anon(input: TokenBuffer) -> UnOpIResult {
-    let (input, x) = alt((
-        take_ident,
-        map(p_unit_arg, |_| String::from("_"))
-    ))(input)?;
-    let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    Ok((input, box move |body| FnE(None, x.clone(), body)))
+pub fn p_fn_arg(input: TokenBuffer) -> IResult<TokenBuffer, (String, Type)> {
+    alt((
+        map(p_unit_arg, |_| (String::from("_"), Type::UnitT)),
+        p_var_type_pair,
+    ))(input)
 }
 
-pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
-    let (input, _) = opt(ttag(&T_FN))(input)?;
-    let (input, name) = take_ident(input)?;
-    let (input, _) = ttag(&T_COLONCOLON)(input)?;
-    let (input, arg) = alt((
-        take_ident,
-        map(p_unit_arg, |_| String::from("_"))
-    ))(input)?;
+pub fn p_func_anon(input: TokenBuffer) -> UnOpIResult {
+    let (input, (x, t)) = p_fn_arg(input)?;
     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
-    Ok((input, box move |body| {
-        FnE(Some(name.clone()), arg.clone(), body)
-    }))
+    Ok((input, box move |body| FnE(None, x.clone(), t.clone(), body)))
 }
+
+// pub fn p_func_named(input: TokenBuffer) -> UnOpIResult {
+//     let (input, _) = opt(ttag(&T_FN))(input)?;
+//     let (input, name) = take_ident(input)?;
+//     let (input, _) = ttag(&T_COLONCOLON)(input)?;
+//     let (input, (arg, t)) = p_fn_arg(input)?;
+//     let (input, _) = ttag(&T_FAT_ARROW_R)(input)?;
+//     Ok((input, box move |body| {
+//         FnE(Some(name.clone()), arg.clone(), t.clone(), body)
+//     }))
+// }
 
 fn p_access(input: TokenBuffer) -> UnOpIResult {
     let (input, _) = ttag(&T_DOT)(input)?;

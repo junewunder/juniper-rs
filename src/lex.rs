@@ -118,12 +118,17 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
             )),
             |x: &str| Token::Keywd(x.into()),
         ),
-        map(alt((tag("true"), tag("false"))), |x: &str| {
-            Token::Prim(x.into())
-        }),
+        map(
+            alt((
+                tag("true"), tag("false"),
+                tag("num"), tag("bool"), tag("unit"), tag("string"), tag("any"),
+            )),
+            |x: &str| Token::Prim(x.into())
+        ),
         map(
             alt((
                 tag("=>"),
+                tag("->"),
                 tag("&&"),
                 tag("||"),
                 tag("=="),

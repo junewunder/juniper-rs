@@ -1,19 +1,19 @@
-fn to_num :: n => n (i => i + 1) 0
+fn to_num : n => n (i => i + 1) 0
 
-fn zero :: x => x
-fn suc :: n => f => x => f (n f x)
+fn zero : x => x
+fn suc : n => f => x => f (n f x)
 
-fn add :: n => m => f => x => m f (n f x)
-fn mul :: n => m => f => x => m (n f) x
+fn add : n => m => f => x => m f (n f x)
+fn mul : n => m => f => x => m (n f) x
 
-fn fi :: bool => thn => els => bool thn els
-fn tru :: thn => els => thn
-fn fls :: thn => els => els
+fn fi : bool => thn => els => bool thn els
+fn tru : thn => els => thn
+fn fls : thn => els => els
 
-fn not :: bool => thn => els => bool els thn
-fn or :: a => b => a(a)(b)
-fn and :: a => b => a(b)(a)
+fn not : bool => thn => els => bool els thn
+fn or : a => b => a(a)(b)
+fn and : a => b => a(b)(a)
 
-fn main :: x =>
+fn main : x =>
     let a = suc (suc (suc zero)) in
     to_num (mul (add a a) a)
