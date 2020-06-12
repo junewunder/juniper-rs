@@ -44,10 +44,15 @@ pub fn simplify(t: Type, env: &TEnv) -> Type {
 }
 
 fn equiv(env: &TEnv, t1: &Type, t2: &Type) -> bool {
+    use Type::*;
     match (t1, t2) {
         (Type::AnyT, _) => true,
         (_, Type::AnyT) => true,
-        (Type::TypeVar(lhs), Type::TypeVar(rhs)) if lhs == rhs => true,
+        (TypeVar(lhs), TypeVar(rhs)) if lhs == rhs => true,
+        (CloT(i1, o1), CloT(i2, o2)) => {
+            equiv(env, &simplify(*i1.clone(), env), &simplify(*i2.clone(), env))
+            && equiv(env, &simplify(*o1.clone(), env), &simplify(*o2.clone(), env))
+        }
         _ => simplify(t1.clone(), env) == simplify(t2.clone(), env)
     }
 }

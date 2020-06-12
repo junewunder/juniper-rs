@@ -1,0 +1,21 @@
+enum List {
+  Root,
+  Cons(any, List)
+}
+
+map : (any -> any) -> List -> List
+map f xs = {
+  match xs {
+    ::Root => Root,
+    Cons(x, xs) => Cons (f x) (map f xs)
+  }
+}
+
+plus : num -> num -> num
+plus a b = { a + b }
+
+main : () -> any
+main () = {
+  let l = Cons 1 (Cons 2 (Cons 3 Root)) in
+  map (plus 1) l
+}
