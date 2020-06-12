@@ -27,14 +27,14 @@ fn main : x => (
     print "";
 
     match give_this_back test_value {
-      ::Some(x) => print ("thanks for giving me back " + x),
+      Some(x) => print ("thanks for giving me back " + x),
       ::None => print "oh no, you didn't give it back :(",
     };
     print "";
 
     match make_this_work test_value {
-      ::Ok(x) => print ("yay, " + x + " worked!"),
-      ::Err(e) => print ("Q: why didn't it work? A: " + e),
+      Ok(x) => print ("yay, " + x + " worked!"),
+      Err(e) => print ("Q: why didn't it work? A: " + e),
     };
     print "";
 

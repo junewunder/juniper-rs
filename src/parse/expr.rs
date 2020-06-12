@@ -216,39 +216,35 @@ fn p_match_case(input: TokenBuffer) -> IResult<TokenBuffer, (MatchPattern, Box<A
 fn p_match_pattern(input: TokenBuffer) -> IResult<TokenBuffer, MatchPattern> {
     use MatchPattern::*;
     alt((
-        map(p_match_enum_field, |(variant, args)| {
-            VariantPat(variant, args)
-        }),
+        map(p_match_enum_variant, |(variant, args)| VariantPat(variant, args)),
+        map(match_noarg_enum, |(variant, args)| VariantPat(variant, args)),
         map(take_ident, |x| AnyPat(x)),
         map(p_string, |x| {
             if let Expr::StringE(s) = x {
                 StringPat(s)
-            } else {
-                panic!()
-            }
+            } else { panic!() }
         }),
         map(p_num, |x| {
             if let Expr::NumE(n) = x {
                 NumPat(n)
-            } else {
-                panic!()
-            }
+            } else { panic!() }
         }),
     ))(input)
 }
 
-fn p_match_enum_field(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
+fn match_noarg_enum(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
     let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, name) = take_ident(input)?;
-    let (input, variants) = opt(|input| {
-        let (input, _) = ttag(&T_OP_PAREN)(input)?;
-        let (input, variants) = separated_list(ttag(&T_COMMA), p_match_pattern)(input)?;
-        let (input, _) = opt(ttag(&T_COMMA))(input)?;
-        let (input, _) = ttag(&T_CL_PAREN)(input)?;
-        Ok((input, variants))
-    })(input)?;
+    Ok((input, (name, Vec::with_capacity(0))))
+}
 
-    Ok((input, (name, variants.unwrap_or(Vec::with_capacity(0)))))
+fn p_match_enum_variant(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec<MatchPattern>)> {
+    let (input, name) = take_ident(input)?;
+    let (input, _) = ttag(&T_OP_PAREN)(input)?;
+    let (input, variants) = separated_list(ttag(&T_COMMA), p_match_pattern)(input)?;
+    let (input, _) = opt(ttag(&T_COMMA))(input)?;
+    let (input, _) = ttag(&T_CL_PAREN)(input)?;
+    Ok((input, (name, variants)))
 }
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {

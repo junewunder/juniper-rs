@@ -7,8 +7,8 @@ is_even : Nat -> bool
 is_even n = {
   match n {
     ::Zero => true,
-    ::Suc(::Zero) => false,
-    ::Suc(::Suc(n)) => is_even n,
+    Suc(::Zero) => false,
+    Suc(Suc(n)) => is_even n,
   }
 }
 
@@ -16,8 +16,8 @@ is_odd : Nat -> bool
 is_odd n = {
   match n {
     ::Zero => false,
-    ::Suc(::Zero) => true,
-    ::Suc(::Suc(n)) => is_odd(n),
+    Suc(::Zero) => true,
+    Suc(Suc(n)) => is_odd(n),
   }
 }
 

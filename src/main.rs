@@ -92,7 +92,7 @@ fn interp_from_file(filename: &str) -> interp::InterpResult {
     let filename = String::from(filename);
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
-    // let _ = typecheck::
+    let tenv = typecheck::check_program(ast.clone())?;
     interp::interp_program(ast)
 }
 
@@ -113,13 +113,10 @@ fn parse_from_file(filename: &str) -> IResult<TokenBuffer, Vec<Box<Annotated<Def
     parse::p_defs(tokbuf)
 }
 
-// fn lex_from_file(filename: &str) -> IResult<&str, TokenBuffer> {
-//
-// }
-
 fn interp_expr(input: &str, env: &Env) -> interp::InterpResult {
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     let (r, ast) = parse::p_expr(tokbuf).expect("expr failed parsing");
+    let tenv = typecheck::check_expr(ast.clone(), &im::HashMap::new())?;
     interp::interp_expr(ast, env)
 }
 
