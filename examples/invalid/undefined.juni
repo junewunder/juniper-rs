@@ -1,2 +1,2 @@
-fn main :: x =>
+fn main : x =>
   y

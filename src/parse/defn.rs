@@ -18,7 +18,7 @@ pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn
 
 pub fn p_tl_var(input: TokenBuffer) -> DefnIResult {
     let (input, name) = take_ident(input)?;
-    let (input, _) = ttag(&T_COLONCOLON)(input)?;
+    let (input, _) = ttag(&T_COLON)(input)?;
     let (input, ty) = p_type(input)?;
     let (input, _) = take_ident(input)?; //TODO make sure this is the same as name
     let (input, args) = many0(p_fn_arg)(input)?;

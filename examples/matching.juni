@@ -8,19 +8,19 @@ enum Result {
   Err(error)
 }
 
-fn give_this_back :: x => (
+fn give_this_back : x => (
   if (random ()) > 0.5 then
     Some x
   else None
 )
 
-fn make_this_work :: x => (
+fn make_this_work : x => (
   if (random ()) > 0.5 then
     Ok x
   else Err "oops! it didn't work :("
 )
 
-fn main :: x => (
+fn main : x => (
   let test_value = 42 in (
 
     print ("test_value = " + test_value);

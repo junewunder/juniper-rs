@@ -262,7 +262,7 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
             Ok(Type::TypeVar(name))
         }
         Expr::AccessE(e, x) => {
-            match check(e, env)? {
+            match check(e, env)? { // TODO: This does not work with accessing because I need to simplify
                 ObjectT(fields) | StructT(_, fields) => fields.get(&x).cloned().ok_or_else(|| TypeError {
                     kind: UndefinedError(x),
                     idx: err_idx,
@@ -272,7 +272,7 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
                 _ => return err!(TempFiller(14)),
             }
         }
-        // Expr::MatchE(subject, patterns) => {
+        // Expr::MatchE(subject, patterns) => { // TODO: lol
         //     use MatchPattern::*;
         //     let subject = interp(subject, env)?;
         //     for (pattern, body) in patterns.iter() {

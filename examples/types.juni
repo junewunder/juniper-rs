@@ -15,7 +15,7 @@ enum List {
   Cons(any, List)
 }
 
-fn main :: () =>
+fn main : () =>
   let list = (Cons 3 (Cons 2 (Cons 1 Root))) in
   let june = Person {
     name: "June",

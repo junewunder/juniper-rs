@@ -1,6 +1,6 @@
-fn greet :: greeting: string => name: string =>
+fn greet : greeting: string => name: string =>
   print (greeting + ", " + name);
 
-fn main :: () =>
+fn main : () =>
   let sayHello = greet "Hello"
   in sayHello "June";
