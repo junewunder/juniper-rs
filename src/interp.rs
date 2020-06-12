@@ -5,7 +5,7 @@ use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-type DefVarEnv = HashMap<String, Box<Annotated<Expr>>>;
+type DefFnEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
 pub type InterpResult = std::result::Result<Value, InterpError>;
 
 pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
@@ -19,19 +19,24 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     .collect();
 
     let env = defs.iter().fold(env, interp_scopeless_defs);
-
     let env_cell = RefCell::new(env);
     let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
+    let denv: DefFnEnv = defs.iter().fold(HashMap::new(), interp_fn_defs);
 
-    let denv: DefVarEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
-    for (name, body) in denv.into_iter() {
+    for (name, (arg, body)) in denv.into_iter() {
         env_cell.borrow_mut().insert(
             name.clone(),
             Value::CloV(Some(name), arg, body, env_rc.clone()),
         );
     }
 
-    // println!("{}", print_env_safe(&env_rc));
+    for def in defs.iter() {
+        if let Some((name, value)) = interp_val_def(def, &env_rc) {
+            env_cell.borrow_mut().insert(name, value?);
+        }
+    }
+
+    println!("{}", print_env(&env_rc));
     if let Some(Value::CloV(_, arg, body, env)) = env_rc.get("main".into()) {
         return interp_expr(body.clone(), &env);
     }
@@ -39,12 +44,27 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     panic!("no <main> method")
 }
 
-fn interp_fn_defs(denv: DefVarEnv, def: Box<Annotated<Defn>>) -> DefVarEnv {
-    use Defn::*;
-    match def.unwrap() {
-        // TODO MAKE THIS RIGHT ADD FUNCTION WRAPPERS THAT ACTUALLY TAKE THE ARGUMENTS
-        Defn::VarD(name, args, rt, body) => denv.update(name, body),
+fn interp_fn_defs(denv: DefFnEnv, def: &Box<Annotated<Defn>>) -> DefFnEnv {
+    match def.clone().unwrap() {
+        Defn::VarD(name, xs, rt, body) if xs.len() > 0 => {
+            let mut xt_s = xs.iter().zip(rt.clone().into_iter().collect::<Vec<_>>());
+            let (x, t) = xt_s.next().unwrap();
+            let e = xt_s.rev().fold(body, |acc, (x, t)| {
+                let next = Expr::FnE(None, x.clone(), t.clone(), acc);
+                Box::new(Annotated::zero(next))
+            });
+            denv.update(name, (x.clone(), e))
+        },
         _ => denv,
+    }
+}
+
+fn interp_val_def(def: &Box<Annotated<Defn>>, env: &Env) -> Option<(String, InterpResult)> {
+    match def.clone().unwrap() {
+        Defn::VarD(name, xs, rt, body) if xs.len() == 0 => {
+            Some((name, interp_expr(body, env)))
+        },
+        _ => None,
     }
 }
 

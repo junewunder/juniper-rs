@@ -115,7 +115,7 @@ impl Display for Value {
             CloV(name, arg, expr, env) => {
                 let arg = if arg == "_" { "()" } else { arg };
                 let name = name.clone().unwrap_or("{anon}".to_string());
-                write!(f, "<fn {} :: {} {}>", name, arg, print_env_safe(env))
+                write!(f, "<fn {} :: {} {}>", name, arg, print_env(env))
             }
             ObjectV(name, fields) => {
                 let name = name
@@ -227,7 +227,7 @@ impl Iterator for TypeIterator {
 // }
 
 pub fn print_tenv(env: &TEnv) -> String {
-    let mut env_str = format!("{{ ");
+    let mut env_str = format!("tenv {{ ");
     for (k, v) in env.iter() {
         env_str += &format!("\n    {}: {}, ", k, v)
     }
@@ -235,19 +235,20 @@ pub fn print_tenv(env: &TEnv) -> String {
     env_str + "\n}"
 }
 
-pub fn print_env_safe(env: &Rc<Env>) -> String {
-    let mut env_str = format!("{{ ");
+pub fn print_env(env: &Rc<Env>) -> String {
+    let mut env_str = format!("env {{ ");
     for (k, v) in env.iter() {
         match v {
             Value::CloV(_, arg, _, _) if arg == "_" => {
-                env_str += &format!("{}: <fn ()>, ", k)
+                env_str += &format!("\n    {}: <fn ()>, ", k)
             }
             Value::CloV(_, arg, _, _) => {
-                env_str += &format!("{}: <fn {}>, ", k, arg)
+                env_str += &format!("\n    {}: <fn {}>, ", k, arg)
             }
-            _ => env_str += &format!("{}: {}, ", k, v),
+            Value::PrimV(_) => (), // THIS MAKES PRIMS NOT BE PRINTED
+            _ => env_str += &format!("\n    {}: {}, ", k, v),
         }
     }
     env_str = env_str.trim_end_matches(", ").into();
-    format!("{} }}", env_str)
+    env_str + "\n}"
 }
