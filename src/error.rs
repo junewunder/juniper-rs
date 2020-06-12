@@ -23,7 +23,8 @@ pub struct AnnotatedError<ErrorKind> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InterpErrorKind {
-    TypeError,
+    TypeError, // TODO: DynamicTypeError
+    StaticTypeError(TypeErrorKind),
     UndefinedError(String),
     DerefError(Value),
     MissingFieldError(String),
@@ -119,17 +120,6 @@ impl error::Error for ParseError {
     }
 }
 
-// impl Into<ParseError> for (crate::lex::TokenBuffer, NomErrorKind) {
-//     fn into(self) -> ParseError {
-//         AnnotatedError {
-//             kind: ParseErrorKind::NomError(self.1),
-//             idx: self.0.first().map_or(0, |x| x.idx),
-//             len: self.0.last().map_or(0, |x| x.len),
-//             loc: None,
-//         }
-//     }
-// }
-
 impl From<(crate::lex::TokenBuffer, NomErrorKind)> for ParseError {
     fn from(error: (crate::lex::TokenBuffer, NomErrorKind)) -> Self {
         AnnotatedError {
@@ -137,6 +127,17 @@ impl From<(crate::lex::TokenBuffer, NomErrorKind)> for ParseError {
             idx: error.0.first().map_or(0, |x| x.idx),
             len: error.0.last().map_or(0, |x| x.len),
             loc: None,
+        }
+    }
+}
+
+impl From<TypeError> for InterpError {
+    fn from(error: TypeError) -> Self {
+        AnnotatedError {
+            kind: InterpErrorKind::StaticTypeError(error.kind),
+            idx: error.idx,
+            len: error.len,
+            loc: error.loc,
         }
     }
 }

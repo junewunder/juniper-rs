@@ -27,7 +27,7 @@ pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError>
     Ok(env)
 }
 
-fn simplify(t: Type, env: &TEnv) -> Type {
+pub fn simplify(t: Type, env: &TEnv) -> Type {
     match t {
         Type::TypeVar(name) => env.get(&name).cloned().unwrap_or(Type::UnknownT),
         // Type::MutT(t) | Type::RefT(t) => Type::MutT(Box::new(simplify(env, t))),
@@ -317,41 +317,3 @@ fn match_subject(subject: &Type, pattern: &MatchPattern, env: &TEnv) -> Option<T
         _ => None,
     }
 }
-
-// fn interp_prim(name: String, values: Vec<Value>) -> TypeResult {
-//     use InterpErrorKind::*;
-//     use Value::*;
-//     match name.as_str() {
-//         "print" => {
-//             if let Some(v) = values.first() {
-//                 match v {
-//                     StringV(s) => println!("{}", s),
-//                     _ => println!("{}", v),
-//                 }
-//             } else {
-//                 println!("None");
-//             }
-//             Ok(PrimV("print".into()))
-//         }
-//         "delay" => {
-//             use std::{thread, time};
-//             if let Some(NumV(n)) = values.first() {
-//                 let ten_millis = time::Duration::from_millis(*n as u64);
-//                 thread::sleep(ten_millis);
-//                 Ok(UnitV)
-//             } else {
-//                 Ok(PrimV("delay".into()))
-//             }
-//         }
-//         "random" => Ok(NumV(rand::random())),
-//         "round" => {
-//             use std::{thread, time};
-//             if let Some(NumV(n)) = values.first() {
-//                 Ok(NumV(n.round()))
-//             } else {
-//                 Ok(PrimV("round".into()))
-//             }
-//         }
-//         _ => panic!("no primitive named: {:?}", name),
-//     }
-// }

@@ -30,3 +30,4 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - use Weak reference counting in CloV?
  - mutable struct values
  - bug: variable names that conatain keywords can't be parsed
+ - scoped types?
