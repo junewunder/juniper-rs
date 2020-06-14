@@ -1,25 +1,18 @@
 use crate::data::*;
 use crate::typecheck::*;
 
-
-// pub fn map
-
 pub fn simplify(t: Type, env: &TEnv) -> Type {
     // dbg!(&t);
     match t {
         Type::TypeVar(name) => {
             let t = env.get(&name).cloned().unwrap_or(Type::TypeVar(name.clone()));
-            // println!("{}", print_tenv(&env));
-            // println!("t {:?}", t);
             if let Type::TypeVar(other) = t.clone() {
                 if name == other { return t }
             }
             simplify(t, env)
         },
         Type::ConcreteT(root, t_val) => {
-            // dbg!(&root);
             let root = simplify(*root, env);
-            // dbg!(&root);
             match root {
                 Type::GenericT(root, t_name) => {
                     let env = env.update(t_name, *t_val);
@@ -42,27 +35,25 @@ pub fn simplify(t: Type, env: &TEnv) -> Type {
             Type::CloT(box simplify(*i, env), box simplify(*o, env))
         }
         Type::EnumT(name, variants) => {
+            let env = env.update(name.clone(), Type::TypeVar(name.clone()));
             let next_variants = variants.into_iter()
-                .map(|(k, params)| {
+                .map(|(k, params)|
                     (k, params.into_iter()
-                        .map(|x| {
-                            let env = env.update(name.clone(), Type::TypeVar(name.clone()));
-                            simplify(x, &env)
-                        })
+                        .map(|x| simplify(x, &env))
                         .collect::<Vec<_>>())
-                })
+                )
                 .collect::<im::HashMap<_,_>>();
-
             Type::EnumT(name, next_variants)
         }
         Type::StructT(name, fields) => {
+            let env = env.update(name.clone(), Type::TypeVar(name.clone()));
             let next_fields = fields.into_iter()
-                .map(|(k, v)| (k, simplify(v, env)))
+                .map(|(k, v)| (k, simplify(v, &env)))
                 .collect::<im::HashMap<_,_>>();
 
             Type::StructT(name, next_fields)
         }
-        Type::MutT(t) => Type::MutT(Box::new(simplify(*t, env))),
+        Type::MutT(t) => Type::MutT(box simplify(*t, env)),
         _ => t
     }
 }
