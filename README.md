@@ -9,6 +9,30 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - how to typecheck with mutual recursion??
  - .....how bad would it be to implement algorithm W....
 
+## features so far:
+
+ - bools, numbers, strings
+ - mutability
+ - while loops
+ - primitives
+ - error reporting on interpreting
+ - arrays/objects/structs
+ - match/case analysis
+
+## features to do:
+
+ - traits
+ - modules
+ - type inference
+ - parser errors
+
+ - REPL functionality
+ - scoped types?
+ - parse values from command line to main function
+ - detect when mut value is trying to be used without being dereferenced
+ - mutable struct values
+ - bug: variable names that start with keywords can't be parsed
+
 ## plan for generics
 add types GenericT(t, var) and ConcreteT(t, val)
 assume there is a type: T x y z, which should be instantiated to T num string bool
@@ -31,26 +55,3 @@ ConcreteT(
     , string)
   , bool)
 ```
-
-## features so far:
-
- - bools, numbers, strings
- - mutability
- - while loops
- - primitives
- - error reporting on interpreting
- - arrays/objects/structs
- - match/case analysis
-
-## features to do:
-
- - error reporting on parsing
- - modules
- - top level constants -> create BlockV which is closure but without arguments
- - REPL functionality
- - parse values from command line to main function
- - detect when mut value is trying to be used without being dereferenced
- - use Weak reference counting in CloV?
- - mutable struct values
- - bug: variable names that conatain keywords can't be parsed
- - scoped types?

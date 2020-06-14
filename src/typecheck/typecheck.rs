@@ -204,6 +204,7 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
                 if equiv(env, &*i, &arg_t) {
                     Ok(*o)
                 } else {
+                    println!("tenv {:?}", print_tenv(env));
                     Err(err!(ApplicationError(CloT(i, o), arg_t)))
                 }},
             _ => {

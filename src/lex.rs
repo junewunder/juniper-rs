@@ -109,7 +109,7 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("while"),
                 tag("let"),
                 tag("mut"),
-                tag("in"),
+                // tag("in"),
                 tag("fn"),
                 tag("prim"),
                 tag("struct"),

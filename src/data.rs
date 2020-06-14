@@ -118,7 +118,7 @@ impl Display for Value {
             CloV(name, arg, expr, env) => {
                 let arg = if arg == "_" { "()" } else { arg };
                 let name = name.clone().unwrap_or("{anon}".to_string());
-                write!(f, "<fn {} :: {} {}>", name, arg, print_env(env))
+                write!(f, "<fn {} : {} {}>", name, arg, print_env(env))
             }
             ObjectV(name, fields) => {
                 let name = name
@@ -164,7 +164,7 @@ impl Display for Type {
             CloT(box CloT(ii, io), o) => write!(f, "({} -> {}) -> {}", ii, io, o),
             CloT(i, o) => write!(f, "{} -> {}", i, o),
             GenericT(t, name) => write!(f, "∀ {}. ({})", name, t),
-            ConcreteT(t1, t2) => write!(f, "{}::<{}>", t1, t2),
+            ConcreteT(t1, t2) => write!(f, "{} {}", t1, t2),
             EnumT(name, fields) => {
                 let mut fields = fields.clone().into_iter()
                     .map(|(k, ts)| { format!("{} {}, ", k, ts.iter().map(|t| format!("{} ", t)).collect::<String>()) })

@@ -116,11 +116,11 @@ pub fn peel_generics_defn(env: &TEnv, t: Type) -> (TEnv, Type) {
 }
 
 pub fn wrap_generics_defn(defn: Type, xs: Vec<String>) -> Type {
-    xs.into_iter().fold(defn, |acc, x| Type::GenericT(box acc, x))
+    xs.into_iter().rev().fold(defn, |acc, x| Type::GenericT(box acc, x))
 }
 
 pub fn wrap_concrete_defn(defn: Type, xs: Vec<String>) -> Type {
-    xs.into_iter().rev().fold(defn, |acc, x| Type::ConcreteT(box acc, box Type::TypeVar(x)))
+    xs.into_iter().fold(defn, |acc, x| Type::ConcreteT(box acc, box Type::TypeVar(x)))
 }
 
 // pub fn generic(root: Type, params: Vec<String>) -> Type {

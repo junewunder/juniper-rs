@@ -248,16 +248,19 @@ fn p_match_enum_variant(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec
 }
 
 fn p_type_anno(input: TokenBuffer) -> UnOpIResult {
-    let (input, _) = ttag(&T_COLONCOLON)(input)?;
+    // let (input, _) = ttag(&T_COLONCOLON)(input)?;
     let (input, _) = ttag(&T_LT)(input)?;
-    let (input, t) = p_type(input)?;
+    // let (input, t) = p_type(input)?;
+    let (input, ts) = separated_list(ttag(&T_COMMA), p_type)(input)?;
     let (input, _) = ttag(&T_GT)(input)?;
 
     Ok((input, box move |lhs| {
-        TypeAnnotationE(lhs, t.clone())
+        ts.clone().into_iter().fold(lhs, |lhs, t| {
+            let expr = TypeAnnotationE(lhs, t.clone());
+            box Annotated::zero(expr)
+        }).unwrap()
     }))
 }
-
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
     Ok((input, box move |lhs, rhs| AppE(lhs, rhs)))
