@@ -6,7 +6,7 @@ use crate::lex::{
     TokenBuffer,
 };
 use crate::mixfix::mixfix::*;
-use crate::parse::shared::*;
+use crate::parse::{p_type, shared::*};
 use crate::error::{AnnotatedError, ParseError, ParseErrorKind};
 use nom::{
     self,
@@ -82,7 +82,7 @@ fn make_expr_mixfix() -> MixfixParser<TokenBuffer, Box<Annotated<Expr>>> {
 
     new_op!(P_APP { infix_l: anno_infix_parser(p_app) });
 
-    new_op!(P_ACCESS { postfix: anno_postfix_parser(p_access) });
+    new_op!(P_ACCESS { postfix: anno_postfix_parser(alt((p_access, p_type_anno))) });
 
     MixfixParser {
         terminals: Rc::new(box annotated_terminal(box p_terminals)),
@@ -246,6 +246,18 @@ fn p_match_enum_variant(input: TokenBuffer) -> IResult<TokenBuffer, (String, Vec
     let (input, _) = ttag(&T_CL_PAREN)(input)?;
     Ok((input, (name, variants)))
 }
+
+fn p_type_anno(input: TokenBuffer) -> UnOpIResult {
+    let (input, _) = ttag(&T_COLONCOLON)(input)?;
+    let (input, _) = ttag(&T_LT)(input)?;
+    let (input, t) = p_type(input)?;
+    let (input, _) = ttag(&T_GT)(input)?;
+
+    Ok((input, box move |lhs| {
+        TypeAnnotationE(lhs, t.clone())
+    }))
+}
+
 
 fn p_app(input: TokenBuffer) -> BinOpIResult {
     Ok((input, box move |lhs, rhs| AppE(lhs, rhs)))

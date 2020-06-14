@@ -1,3 +1,4 @@
+use crate::typecheck::*;
 use crate::annotate::Annotated;
 use crate::data::*;
 use crate::error::*;
@@ -10,16 +11,17 @@ pub type TypeResult = Result<Type, TypeError>;
 pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError> {
     use Type::*;
     let mut env: TEnv = vec![
-        ("delay".into(), Type::CloT(Box::new(NumT), Box::new(UnitT))),
-        ("print".into(), Type::CloT(Box::new(AnyT), Box::new(UnitT))),
-        ("random".into(), Type::CloT(Box::new(UnitT), Box::new(NumT))),
-        ("round".into(), Type::CloT(Box::new(NumT), Box::new(NumT))),
+        // ("delay".into(), Type::CloT(Box::new(NumT), Box::new(UnitT))),
+        // ("print".into(), Type::CloT(Box::new(AnyT), Box::new(UnitT))),
+        // ("random".into(), Type::CloT(Box::new(UnitT), Box::new(NumT))),
+        // ("round".into(), Type::CloT(Box::new(NumT), Box::new(NumT))),
     ]
     .into_iter()
     .collect();
-    // let env = defs.iter().fold(env, init_type_in_scope)
+    // println!("{:?}", );
     let env = defs.iter().fold(env, check_data_defs);
-    // let _ = defs.iter().map(env, );
+    println!("{}", print_tenv(&env));
+    // dbg!(&env);
     for def in defs {
         check_var_defs(&env, &def)?
     };
@@ -27,54 +29,28 @@ pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError>
     Ok(env)
 }
 
-pub fn simplify(t: Type, env: &TEnv) -> Type {
-    match t {
-        Type::TypeVar(name) => env.get(&name).cloned().unwrap_or(Type::UnknownT),
-        // Type::MutT(t) | Type::RefT(t) => Type::MutT(Box::new(simplify(env, t))),
-        // Type::CloT(t_arg, t_body) => {
-        //     let t_arg = Box::new(simplify(env, *t_arg));
-        //     let t_body = Box::new(simplify(env, *t_body));
-        //     Type::CloT(t_arg, t_body)
-        // }
-        // Type::ObjectT =>
-        // Type::StructT =>
-        // Type::EnumT =>
-        _ => t
-    }
-}
-
-fn equiv(env: &TEnv, t1: &Type, t2: &Type) -> bool {
-    use Type::*;
-    match (t1, t2) {
-        (Type::AnyT, _) => true,
-        (_, Type::AnyT) => true,
-        (TypeVar(lhs), TypeVar(rhs)) if lhs == rhs => true,
-        (CloT(i1, o1), CloT(i2, o2)) => {
-            equiv(env, &simplify(*i1.clone(), env), &simplify(*i2.clone(), env))
-            && equiv(env, &simplify(*o1.clone(), env), &simplify(*o2.clone(), env))
-        }
-        _ => simplify(t1.clone(), env) == simplify(t2.clone(), env)
-    }
-}
-
 fn check_data_defs(env: TEnv, def: &Box<Annotated<Defn>>) -> TEnv {
     match def.clone().unwrap() {
-        Defn::StructD(name, fields) => env.update(name.clone(), Type::StructT(name, fields)),
-        Defn::EnumD(enum_name, variants) => {
-            let env = env.update(enum_name.clone(), Type::EnumT(enum_name.clone(), variants.clone()));
+        Defn::StructD(name, t_params, fields) => env.update(
+            name.clone(),
+            wrap_generics_defn(Type::StructT(name, fields), t_params)
+        ),
+        Defn::EnumD(enum_name, t_params, variants) => {
+            let mut env = env.update(
+                enum_name.clone(),
+                wrap_generics_defn(Type::EnumT(enum_name.clone(), variants.clone()), t_params.clone())
+            );
             let enum_t = Type::TypeVar(enum_name);
-            env.union(
-                variants.iter()
-                    .map(|(name, ts)| {
-                        (name.clone(), ts.iter().rev().fold(
-                            enum_t.clone(),
-                            |acc, t| Type::CloT(Box::new(t.clone()), Box::new(acc))
-                        ))
-                    })
-                    .collect()
-            )
+            for (name, ts) in variants.iter() {
+                let constructor = ts.iter().rev().fold(
+                    wrap_concrete_defn(enum_t.clone(), t_params.clone()),
+                    |acc, t| Type::CloT(box t.clone(), box acc)
+                );
+                env.insert(name.clone(), wrap_generics_defn(constructor, t_params.clone()));
+            }
+            env
         },
-        Defn::VarD(name, _, rt, _) => env.update(name.clone(), rt.clone()),
+        Defn::VarD(name, t_args, rt, _) => env.update(name.clone(), rt.clone()),
         // Defn::PrimD(name, mut xs) => env.update(name, v)
         _ => env
     }
@@ -82,9 +58,14 @@ fn check_data_defs(env: TEnv, def: &Box<Annotated<Defn>>) -> TEnv {
 
 fn check_var_defs(env: &TEnv, def: &Box<Annotated<Defn>>) -> Result<(), TypeError> {
     use Defn::*;
+    // dbg!(def);
     match def.clone().unwrap() {
         Defn::VarD(name, args, rt, body) => {
+            // println!("{:?}", args);
+            // println!("{:?}", rt);
+            let (env, rt) = peel_generics_defn(env, rt);
             let arg_ts = rt.clone().into_iter().take(args.len());
+            println!("HELLO {:?}", rt.clone().into_iter().take(args.len()).collect::<Vec<_>>());
             let env_body = args.iter()
                 .zip(arg_ts)
                 .fold(env.clone(), |env, (x, t)| env.update(x.clone(), t));
@@ -213,16 +194,38 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
             check(e2, env)
         }
         Expr::FnE(name, x, t, body) => Ok(CloT(Box::new(t), Box::new(check(body, env)?))),
-        Expr::AppE(f, param) => match (check(f, env)?, check(param, env)?) {
+
+        Expr::AppE(f, param) => {
+            let hmm = (simplify(check(f.clone(), env)?, env), simplify(check(param.clone(), env)?, env));
+            // dbg!(&hmm);
+            // dbg!(&f);
+            // dbg!(check(f, env)?);
+            // dbg!(&param);
+            // dbg!(check(param, env)?);
+            // println!("", );
+            match hmm {
             (CloT(i, o), arg_t) => {
                 if equiv(env, &*i, &arg_t) {
                     Ok(*o.clone())
                 } else {
-                    Err(err!(ApplicationError(*i.clone(), arg_t.clone())))
+                    Err(err!(ApplicationError(CloT(i, o), arg_t)))
                 }},
             // (PrimT(name), arg_v) => check_prim(name, vec![arg_v]),
-            _ => Err(err!(TempFiller(12))),
-        },
+            _ => {
+                // println!("ERROR 12 FROM");
+                // dbg!(f);
+                // dbg!(param);
+                Err(err!(TempFiller(12)))
+            },
+        }},
+
+        Expr::TypeAnnotationE(e, t) => {
+            let before = check(e.clone(), &env)?;
+            dbg!(&before);
+            let after = simplify(ConcreteT(box before, box t.clone()), &env);
+            dbg!(after);
+            Ok(simplify(ConcreteT(box check(e, env)?, box t), env))
+        }
         Expr::WhileE(pred, body) => {
             match check(pred.clone(), env)? {
                 Type::BoolT => (),
@@ -275,8 +278,10 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
             let subject = check(subject, env)?;
             let mut arm_ts: Vec<Type> = Vec::with_capacity(patterns.len());
             for (pattern, body) in patterns.iter() {
-                if let Some(extension) = match_subject(&subject, pattern, env) {
+                if let Some(extension) = match_subject(dbg!(&subject), dbg!(pattern), env) {
+                    // dbg!(&extension);
                     let extended_env: TEnv = extension.union(env.clone());
+                    // dbg!(&extended_env);
                     let arm_t = check(body.clone(), &extended_env)?;
                     arm_ts.push(arm_t);
                 } else {
@@ -285,8 +290,9 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
             }
             let first = arm_ts.pop().unwrap();
             while arm_ts.len() > 0 {
-                if !equiv(env, &first, &arm_ts.pop().unwrap()) {
-                    return Err(err!(TempFiller(17)))
+                let t_cur = arm_ts.pop().unwrap();
+                if !equiv(env, &first, &t_cur) {
+                    return Err(err!(TypeErrorKind::UnexpectedTypeError(first, t_cur)))
                 }
             }
             Ok(first)
@@ -298,8 +304,12 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
 // TODO: return Result instead of Option
 fn match_subject(subject: &Type, pattern: &MatchPattern, env: &TEnv) -> Option<TEnv> {
     let subject = simplify(subject.clone(), env);
+    // dbg!(&subject);
+    // dbg!(&pattern);
     match (&subject, pattern) {
         (Type::EnumT(enum_name, variants), MatchPattern::VariantPat(variant_name, patterns)) => {
+            // dbg!(&variant_name);
+            // dbg!(&patterns);
             let ts = variants.get(variant_name)?;
             if ts.len() != patterns.len() {
                 return None;
@@ -319,6 +329,9 @@ fn match_subject(subject: &Type, pattern: &MatchPattern, env: &TEnv) -> Option<T
         (value, MatchPattern::AnyPat(name)) => {
             Some(HashMap::unit(name.clone(), value.clone()))
         }
-        _ => None,
+        _ => {
+            println!("hewwo?????", );
+            None
+        },
     }
 }

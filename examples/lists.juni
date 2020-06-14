@@ -1,21 +1,46 @@
-enum List {
+enum List T {
   Root,
-  Cons(any, List)
+  Cons(T, List T),
 }
 
-map : (any -> any) -> List -> List
+map A B : (A -> B) -> List A -> List B;
 map f xs = {
   match xs {
-    ::Root => Root,
-    Cons(x, xs) => Cons (f x) (map f xs)
+    ::Root => Root::<B>,
+    # map is not the correct behavior
+    # should be able to overload with map::<B>::<A>
+    Cons(x, xs) => Cons::<B> (f x) (map f xs)
   }
 }
 
-plus : num -> num -> num
+foldr A B : (A -> B -> B) -> B -> List A -> B;
+foldr f b as = {
+  match as {
+    Cons(a, ::Root) => f a b,
+    Cons(a, as) => foldr f (f a b) as,
+  }
+}
+
+foldl A B : (A -> B -> B) -> B -> List A -> B;
+foldl f b as = {
+  match as {
+    Cons(a, ::Root) => f a b,
+    Cons(a, as) => f a (foldl f b as),
+  }
+}
+
+plus : num -> num -> num;
 plus a b = { a + b }
 
-main : () -> any
+#to_string T : T -> string;
+#to_string x = { "" + x }
+
+main : () -> any;
 main () = {
-  let l = Cons 1 (Cons 2 (Cons 3 Root)) in
-  map (plus 1) l
+  let list = Cons::<num> 1 (Cons::<num> 2 (Cons::<num> 3 Root::<num>)) in (
+    map::<num>::<num> (plus 1) list;
+    #map::<string>::<num> to_string list;
+    foldr::<num>::<num> plus 0 list;
+    foldl::<num>::<num> plus 0 list;
+  )
 }

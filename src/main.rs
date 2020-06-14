@@ -1,6 +1,7 @@
 #![feature(type_alias_impl_trait)]
 #![feature(trait_alias)]
 #![feature(box_syntax)]
+#![feature(box_patterns)]
 #![feature(get_mut_unchecked)]
 #![allow(unused)]
 
@@ -12,6 +13,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate clap;
 extern crate rand;
+extern crate colored;
 
 mod annotate;
 mod data;
@@ -27,6 +29,7 @@ use crate::data::Defn;
 use crate::error::TypeError;
 use crate::lex::TokenBuffer;
 use crate::parse::ExprIResult;
+use colored::*;
 use nom::IResult;
 use clap::Clap;
 use data::*;
@@ -53,6 +56,12 @@ struct Opts {
 
 fn main() {
     let opts: Opts = Opts::parse();
+    println!("{}", parse_type("num"));
+    println!("{}", parse_type("A"));
+    println!("{}", parse_type("A -> B"));
+    println!("{}", parse_type("A -> B -> C"));
+    println!("{}", parse_type("A -> (B -> C) -> D"));
+    println!("{}", parse_type("A -> (B -> C) -> (D -> (E -> F) -> G) -> H"));
 
     if opts.lex {
         let input = fs::read_to_string(opts.target.as_str()).expect("Unable to read file");
@@ -133,13 +142,6 @@ fn parse_type(input: &str) -> Type {
 }
 
 // Some random expressions for manual testing
-// println!("{:?}", parse_type("num"));
-// println!("{:?}", parse_type("A"));
-// println!("{:?}", parse_type("A -> B"));
-// println!("{:?}", parse_type("A -> B -> C"));
-// println!("{:?}", parse_type("A -> (B -> C) -> D"));
-// println!("{:?}", parse_type("A -> (B -> C) -> D -> E -> (F -> G -> H)"));
-
 // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));
 // println!("{:?}", fully_interp_expr("print -1; true", &env));
 // println!("{:?}", fully_interp_expr("let foo = 1 in let bar = 2 in foo", &env));

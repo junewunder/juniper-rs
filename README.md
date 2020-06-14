@@ -9,6 +9,29 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
  - how to typecheck with mutual recursion??
  - .....how bad would it be to implement algorithm W....
 
+## plan for generics
+add types GenericT(t, var) and ConcreteT(t, val)
+assume there is a type: T x y z, which should be instantiated to T num string bool
+ - x = num
+ - y = string
+ - z = bool
+then the type AST will be
+```
+ConcreteT(
+  ConcreteT(
+    ConcreteT(
+      GenericT(
+        GenericT(
+          GenericT(
+              ...T...
+            , "z")
+          , "y")
+        , "x")
+      , num)
+    , string)
+  , bool)
+```
+
 ## features so far:
 
  - bools, numbers, strings

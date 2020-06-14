@@ -72,7 +72,7 @@ fn interp_scopeless_defs(env: Env, def: &Box<Annotated<Defn>>) -> Env {
     use Defn::*;
     use Value::*;
     match def.cloned() {
-        StructD(name, fields) => {
+        StructD(name, _, fields) => {
             env.update(name.clone(), Value::StructV(name.clone(), fields.clone()))
         }
         // PrimD(name, mut xs) => {
@@ -83,7 +83,7 @@ fn interp_scopeless_defs(env: Env, def: &Box<Annotated<Defn>>) -> Env {
         //     });
         //     env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
         // }
-        Defn::EnumD(enum_name, variants) => variants.iter().fold(env, |env, (name, ts)| {
+        Defn::EnumD(enum_name, _, variants) => variants.iter().fold(env, |env, (name, ts)| {
             if ts.len() == 0 {
                 return env.update(
                     name.clone(),
@@ -322,6 +322,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             }
             err!(NoMatchError(subject))
         }
+        Expr::TypeAnnotationE(e, t) => interp(e, env),
         _ => err!(UnimplementedBehavior),
     }
 }
