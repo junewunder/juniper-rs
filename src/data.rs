@@ -179,6 +179,7 @@ impl Display for Type {
     }
 }
 
+// TODO make this the fn_iter method instead of this
 impl IntoIterator for Type {
     type Item = Type;
     type IntoIter = TypeIterator;

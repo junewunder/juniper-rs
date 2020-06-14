@@ -7,9 +7,7 @@ map A B : (A -> B) -> List A -> List B;
 map f xs = {
   match xs {
     ::Root => Root::<B>,
-    # map is not the correct behavior
-    # should be able to overload with map::<B>::<A>
-    Cons(x, xs) => Cons::<B> (f x) (map f xs)
+    Cons(x, xs) => Cons::<B> (f x) (map::<B>::<A> f xs)
   }
 }
 
@@ -17,7 +15,7 @@ foldr A B : (A -> B -> B) -> B -> List A -> B;
 foldr f b as = {
   match as {
     Cons(a, ::Root) => f a b,
-    Cons(a, as) => foldr f (f a b) as,
+    Cons(a, as) => foldr::<B>::<A> f (f a b) as,
   }
 }
 
@@ -25,7 +23,7 @@ foldl A B : (A -> B -> B) -> B -> List A -> B;
 foldl f b as = {
   match as {
     Cons(a, ::Root) => f a b,
-    Cons(a, as) => f a (foldl f b as),
+    Cons(a, as) => f a (foldl::<B>::<A> f b as),
   }
 }
 
@@ -39,7 +37,8 @@ main : () -> any;
 main () = {
   let list = Cons::<num> 1 (Cons::<num> 2 (Cons::<num> 3 Root::<num>)) in (
     map::<num>::<num> (plus 1) list;
-    #map::<string>::<num> to_string list;
+    # map::<string>::<num> to_string list;
+    # print ("" + list);
     foldr::<num>::<num> plus 0 list;
     foldl::<num>::<num> plus 0 list;
   )

@@ -29,7 +29,9 @@ pub fn simplify(t: Type, env: &TEnv) -> Type {
             }
         },
         Type::GenericT(root, t_name) => {
-            let root = simplify(*root, env);
+            let mut env = env.clone();
+            env.remove(&t_name); // env.without doesn't work
+            let root = simplify(*root, &env);
             if env.contains_key(&t_name) {
                 root
             } else {

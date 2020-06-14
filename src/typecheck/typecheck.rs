@@ -11,10 +11,10 @@ pub type TypeResult = Result<Type, TypeError>;
 pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError> {
     use Type::*;
     let mut env: TEnv = vec![
-        // ("delay".into(), Type::CloT(Box::new(NumT), Box::new(UnitT))),
-        // ("print".into(), Type::CloT(Box::new(AnyT), Box::new(UnitT))),
-        // ("random".into(), Type::CloT(Box::new(UnitT), Box::new(NumT))),
-        // ("round".into(), Type::CloT(Box::new(NumT), Box::new(NumT))),
+        ("delay".into(), Type::CloT(Box::new(NumT), Box::new(UnitT))),
+        ("print".into(), Type::CloT(Box::new(AnyT), Box::new(UnitT))),
+        ("random".into(), Type::CloT(Box::new(UnitT), Box::new(NumT))),
+        ("round".into(), Type::CloT(Box::new(NumT), Box::new(NumT))),
     ]
     .into_iter()
     .collect();
@@ -63,14 +63,15 @@ fn check_var_defs(env: &TEnv, def: &Box<Annotated<Defn>>) -> Result<(), TypeErro
         Defn::VarD(name, args, rt, body) => {
             // println!("{:?}", args);
             // println!("{:?}", rt);
-            let (env, rt) = peel_generics_defn(env, rt);
-            let arg_ts = rt.clone().into_iter().take(args.len());
-            println!("HELLO {:?}", rt.clone().into_iter().take(args.len()).collect::<Vec<_>>());
+            let (env, rt_inner) = peel_generics_defn(env, rt);
+            let arg_ts = rt_inner.clone().into_iter().take(args.len());
+            println!("HELLO {:?}", rt_inner.clone().into_iter().take(args.len()).collect::<Vec<_>>());
             let env_body = args.iter()
                 .zip(arg_ts)
                 .fold(env.clone(), |env, (x, t)| env.update(x.clone(), t));
 
-            let t_expected = rt.into_iter().skip(args.len()).collect();
+            let t_expected = rt_inner.into_iter().skip(args.len()).collect();
+            dbg!(&env_body);
             let t_body = check_expr(body, &env_body)?;
             if !equiv(&env, &t_body, &t_expected) {
                 return Err(TypeError {
