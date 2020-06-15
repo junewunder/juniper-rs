@@ -3,6 +3,14 @@ enum List T {
   Cons(T, List T),
 }
 
+isnil T : List T -> bool;
+isnil l =  {
+  match xs {
+    ::Root => true,
+    Cons(_, _) => false,
+  }
+}
+
 map A B : (A -> B) -> List A -> List B;
 map f xs = {
   match xs {

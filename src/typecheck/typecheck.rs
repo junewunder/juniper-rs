@@ -107,7 +107,6 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
         };
     }
 
-
     // println!("{:?}", e);
     Ok(simplify(match e {
         Expr::NumE(i) => Ok(NumT),
@@ -212,7 +211,12 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
         }},
 
         Expr::TypeAnnotationE(e, t) => {
-            Ok(ConcreteT(box check(e, env)?, box t))
+            match check(e, env)? {
+                GenericT(root, name) => Ok(Type::ConcreteT(box GenericT(root, name), box t)),
+                _ => {
+                    return Err(err!(TempFiller(17)))
+                }
+            }
         }
         Expr::WhileE(pred, body) => {
             match check(pred.clone(), env)? {
