@@ -95,7 +95,6 @@ pub enum Type {
     StringT,
     AnyT, // TODO: Remove after type parameterization
     UnitT,
-    UnknownT,
     MutT(Box<Type>),
     RefT(Box<Type>),
     PrimT,

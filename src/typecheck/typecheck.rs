@@ -20,7 +20,7 @@ pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError>
     .collect();
     // println!("{:?}", );
     let env = defs.iter().fold(env, check_data_defs);
-    println!("{}", print_tenv(&env));
+    // println!("{}", print_tenv(&env));
     // dbg!(&env);
     for def in defs {
         check_var_defs(&env, &def)?
@@ -65,13 +65,12 @@ fn check_var_defs(env: &TEnv, def: &Box<Annotated<Defn>>) -> Result<(), TypeErro
             // println!("{:?}", rt);
             let (env, rt_inner) = peel_generics_defn(env, rt);
             let arg_ts = rt_inner.clone().into_iter().take(args.len());
-            println!("HELLO {:?}", rt_inner.clone().into_iter().take(args.len()).collect::<Vec<_>>());
             let env_body = args.iter()
                 .zip(arg_ts)
                 .fold(env.clone(), |env, (x, t)| env.update(x.clone(), t));
 
             let t_expected = rt_inner.into_iter().skip(args.len()).collect();
-            dbg!(&env_body);
+            // dbg!(&env_body);
             let t_body = check_expr(body, &env_body)?;
             if !equiv(&env, &t_body, &t_expected) {
                 return Err(TypeError {

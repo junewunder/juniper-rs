@@ -130,9 +130,10 @@ pub fn wrap_concrete_defn(defn: Type, xs: Vec<String>) -> Type {
 // }
 
 
-// pub fn drill(t: Type) -> Type {
-//     match t {
-//         Type::ConcreteT(t1, t2) => drill(*t1),
-//         _ => t,
-//     }
-// }
+pub fn drill(t: Type) -> Type {
+    match t {
+        Type::ConcreteT(t1, _) => drill(*t1),
+        Type::GenericT(t1, _) => drill(*t1),
+        _ => t,
+    }
+}

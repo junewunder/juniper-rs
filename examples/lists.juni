@@ -34,7 +34,6 @@ main : () -> any;
 main () = {
   let list = Cons<num> 1 (Cons<num> 2 (Cons<num> 3 Root<num>)) in (
     map<num, num> (plus 1) list;
-    print ("" + list);
     foldr<num, num> plus 0 list;
     foldl<num, num> plus 0 list;
   )

@@ -1,6 +1,7 @@
 use crate::annotate::Annotated;
 use crate::data::*;
 use crate::error::*;
+use crate::typecheck;
 use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -46,9 +47,11 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
 
 fn interp_fn_defs(denv: DefFnEnv, def: &Box<Annotated<Defn>>) -> DefFnEnv {
     match def.clone().unwrap() {
-        Defn::VarD(name, xs, rt, body) if xs.len() > 0 => {
-            let mut xt_s = xs.iter().zip(rt.clone().into_iter().collect::<Vec<_>>());
-            let (x, t) = xt_s.next().unwrap();
+        Defn::VarD(name, mut xs, rt, body) if xs.len() > 0 => {
+            let mut ts = typecheck::drill(rt).clone().into_iter().collect::<Vec<_>>();
+            let x = xs.remove(0);
+            let t = ts.remove(0);
+            let mut xt_s = xs.iter().zip(ts);
             let e = xt_s.rev().fold(body, |acc, (x, t)| {
                 let next = Expr::FnE(None, x.clone(), t.clone(), acc);
                 Box::new(Annotated::zero(next))

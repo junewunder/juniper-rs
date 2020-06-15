@@ -10,8 +10,10 @@ use nom::combinator::map;
 use nom::combinator::not;
 use nom::combinator::opt;
 use nom::combinator::value;
+use nom::combinator::peek;
 use nom::error::{ErrorKind, ParseError};
 use nom::number::complete::double;
+use nom::sequence::pair;
 use nom::Err;
 use nom::InputIter;
 use nom::{
@@ -102,28 +104,28 @@ fn p_comment(input: &str) -> IResult<&str, Token> {
 pub fn p_reserved(input: &str) -> IResult<&str, Token> {
     let reserved = (
         map(
-            alt((
+            pair(alt((
                 tag("if"),
                 tag("then"),
                 tag("else"),
                 tag("while"),
                 tag("let"),
                 tag("mut"),
-                // tag("in"),
+                tag("in"),
                 tag("fn"),
                 tag("prim"),
                 tag("struct"),
                 tag("enum"),
                 tag("match"),
-            )),
-            |x: &str| Token::Keywd(x.into()),
+            )), peek(not(alt((alpha1, is_a("_")))))),
+            |(x, _): (&str, _)| Token::Keywd(x.into()),
         ),
         map(
-            alt((
+            pair(alt((
                 tag("true"), tag("false"),
                 tag("num"), tag("bool"), tag("unit"), tag("string"), tag("any"),
-            )),
-            |x: &str| Token::Prim(x.into())
+            )), peek(not(alt((alpha1, is_a("_")))))),
+            |(x, _): (&str, _)| Token::Prim(x.into())
         ),
         map(
             alt((
