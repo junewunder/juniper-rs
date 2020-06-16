@@ -4,7 +4,7 @@ enum List T {
 }
 
 isnil T : List T -> bool;
-isnil l =  {
+isnil xs =  {
   match xs {
     ::Root => true,
     Cons(_, _) => false,
