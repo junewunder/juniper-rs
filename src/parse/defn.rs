@@ -1,6 +1,6 @@
 use crate::annotate::*;
 use crate::data::{Defn, Expr, Type};
-use crate::lex::{take_ident, ttag, TokenBuffer};
+use crate::lex::{take_ident, take_string, ttag, TokenBuffer};
 use crate::parse::{expr::p_expr, shared::*, types::p_type};
 use crate::typecheck::wrap_generics_defn;
 use nom::{
@@ -11,9 +11,15 @@ use nom::{
 
 pub fn p_defs(input: TokenBuffer) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
     let (input, defs) = many0(annotated_terminal(alt((
-        p_tl_var, p_prim, p_struct, p_enum,
+        p_tl_var, p_prim, p_struct, p_enum, p_import,
     ))))(input)?;
     Ok((input, defs))
+}
+
+fn p_import(input: TokenBuffer) -> DefnIResult {
+    let (input, _) = ttag(&T_IMPORT)(input)?;
+    let (input, path) = take_string(input)?;
+    Ok((input, Defn::ImportD(path)))
 }
 
 pub fn p_tl_var(input: TokenBuffer) -> DefnIResult {

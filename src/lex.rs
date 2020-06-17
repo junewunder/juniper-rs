@@ -117,6 +117,7 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("struct"),
                 tag("enum"),
                 tag("match"),
+                tag("import"),
             )), peek(not(alt((alpha1, is_a("_")))))),
             |(x, _): (&str, _)| Token::Keywd(x.into()),
         ),
@@ -209,6 +210,22 @@ pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
 
     if let Token::Ident(ident) = t.remove(0).tok {
         return Ok((t, ident.clone()));
+    };
+
+    let e: ErrorKind = ErrorKind::TakeTill1;
+    Err(Err::Error(ParseError::from_error_kind(input, e)))
+}
+
+pub fn take_string(input: TokenBuffer) -> IResult<TokenBuffer, String> {
+    let mut t = input.clone();
+
+    if input.len() == 0 {
+        let e: ErrorKind = ErrorKind::TakeTill1;
+        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+    };
+
+    if let Token::Str(string) = t.remove(0).tok {
+        return Ok((t, string.clone()));
     };
 
     let e: ErrorKind = ErrorKind::TakeTill1;

@@ -5,10 +5,11 @@ use crate::error::*;
 use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::path::PathBuf;
 
 pub type TypeResult = Result<Type, TypeError>;
 
-pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError> {
+pub fn check_program(filename: PathBuf, defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError> {
     use Type::*;
     let mut env: TEnv = vec![
         ("delay".into(), Type::CloT(Box::new(NumT), Box::new(UnitT))),
@@ -18,16 +19,35 @@ pub fn check_program(defs: Vec<Box<Annotated<Defn>>>) -> Result<TEnv, TypeError>
     ]
     .into_iter()
     .collect();
-    // println!("{:?}", );
+
+    let env = defs.iter().try_fold(env, |acc, d| check_imports(filename.clone(), acc, d))?;
     let env = defs.iter().fold(env, check_data_defs);
-    // println!("{}", print_tenv(&env));
-    // dbg!(&env);
     for def in defs {
         check_var_defs(&env, &def)?
     };
 
     Ok(env)
 }
+
+fn check_imports(filename: PathBuf, env: TEnv, def: &Box<Annotated<Defn>>) -> Result<TEnv, TypeError> {
+    match def.clone().unwrap() {
+        Defn::ImportD(path) => {
+            let mut mod_path = PathBuf::from(filename);
+            mod_path.pop();
+            mod_path.push(path);
+            mod_path.set_extension("juni");
+
+            let input = std::fs::read_to_string(mod_path.clone()).expect("Unable to read file");
+            let input = input.as_ref();
+            let (r, tokbuf) = crate::lex::lex(input).expect("expr failed lexing");
+            let (r, ast) = crate::parse::p_defs(tokbuf).expect("expr failed parsing");
+            let imported_env = typecheck::check_program(mod_path, ast.clone())?;
+            Ok(env.union(imported_env))
+        }
+        _ => Ok(env),
+    }
+}
+
 
 fn check_data_defs(env: TEnv, def: &Box<Annotated<Defn>>) -> TEnv {
     match def.clone().unwrap() {
@@ -57,12 +77,8 @@ fn check_data_defs(env: TEnv, def: &Box<Annotated<Defn>>) -> TEnv {
 }
 
 fn check_var_defs(env: &TEnv, def: &Box<Annotated<Defn>>) -> Result<(), TypeError> {
-    use Defn::*;
-    // dbg!(def);
     match def.clone().unwrap() {
         Defn::VarD(name, args, rt, body) => {
-            // println!("{:?}", args);
-            // println!("{:?}", rt);
             let (env, rt_inner) = peel_generics_defn(env, rt);
             let arg_ts = rt_inner.clone().into_iter().take(args.len());
             let env_body = args.iter()
@@ -70,7 +86,6 @@ fn check_var_defs(env: &TEnv, def: &Box<Annotated<Defn>>) -> Result<(), TypeErro
                 .fold(env.clone(), |env, (x, t)| env.update(x.clone(), t));
 
             let t_expected = rt_inner.into_iter().skip(args.len()).collect();
-            // dbg!(&env_body);
             let t_body = check_expr(body, &env_body)?;
             if !equiv(&env, &t_body, &t_expected) {
                 return Err(TypeError {
@@ -202,7 +217,7 @@ pub fn check_expr(e: Box<Annotated<Expr>>, env: &TEnv) -> TypeResult {
                 if equiv(env, &*i, &arg_t) {
                     Ok(*o)
                 } else {
-                    println!("tenv {:?}", print_tenv(env));
+                    // println!("tenv {:?}", print_tenv(env));
                     Err(err!(ApplicationError(CloT(i, o), arg_t)))
                 }},
             _ => {

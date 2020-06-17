@@ -1,9 +1,9 @@
-addOne : mut num -> ()
+addOne : mut num -> ();
 addOne n = {
   !n = (*n) + 1;
 }
 
-main : () -> any
+main : () -> any;
 main () = {
   mut i = 0 in
   mut seq = "1..10 = " in (

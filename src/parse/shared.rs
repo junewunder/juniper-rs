@@ -30,6 +30,7 @@ lazy_static! {
     pub static ref T_STRUCT: Token         = Keywd("struct".into());
     pub static ref T_ENUM: Token           = Keywd("enum".into());
     pub static ref T_MATCH: Token          = Keywd("match".into());
+    pub static ref T_IMPORT: Token         = Keywd("import".into());
     pub static ref T_EQ: Token             = Op("=".into());
     pub static ref T_FAT_ARROW_R: Token    = Op("=>".into());
     pub static ref T_THIN_ARROW_R: Token   = Op("->".into());

@@ -5,11 +5,14 @@ use crate::typecheck;
 use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::path::PathBuf;
 
 type DefFnEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
 pub type InterpResult = std::result::Result<Value, InterpError>;
 
-pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
+pub fn interp_program(filename: PathBuf, defs: Vec<Box<Annotated<Defn>>>) -> Result<Env, InterpError> {
+    // println!("HELLLOOOO INTERP PROGRAM", );
+
     let mut env: Env = vec![
         ("delay".into(), Value::PrimV("delay".into())),
         ("print".into(), Value::PrimV("print".into())),
@@ -19,13 +22,15 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     .into_iter()
     .collect();
 
+    let env = defs.iter().try_fold(env, |acc, d| interp_imports(filename.clone(), acc, d))?;
     let env = defs.iter().fold(env, interp_scopeless_defs);
-    let env_cell = RefCell::new(env);
-    let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
+    let env_rc = Rc::new(env);
+    let mut env_mut = env_rc.clone();
+    let env_ptr = unsafe { Rc::get_mut_unchecked(&mut env_mut) };
     let denv: DefFnEnv = defs.iter().fold(HashMap::new(), interp_fn_defs);
 
     for (name, (arg, body)) in denv.into_iter() {
-        env_cell.borrow_mut().insert(
+        env_ptr.insert(
             name.clone(),
             Value::CloV(Some(name), arg, body, env_rc.clone()),
         );
@@ -33,16 +38,33 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
 
     for def in defs.iter() {
         if let Some((name, value)) = interp_val_def(def, &env_rc) {
-            env_cell.borrow_mut().insert(name, value?);
+            env_ptr.insert(name, value?);
         }
     }
 
-    println!("{}", print_env(&env_rc));
-    if let Some(Value::CloV(_, arg, body, env)) = env_rc.get("main".into()) {
-        return interp_expr(body.clone(), &env);
-    }
+    Ok((*env_rc.clone()).clone())
+}
 
-    panic!("no <main> method")
+fn interp_imports(filename: PathBuf, env: Env, def: &Box<Annotated<Defn>>) -> Result<Env, InterpError> {
+    match def.clone().unwrap() {
+        Defn::ImportD(path) => {
+            let mut mod_path = PathBuf::from(filename);
+            mod_path.pop();
+            mod_path.push(path);
+            mod_path.set_extension("juni");
+
+
+            println!("{:?}", mod_path);
+            let input = std::fs::read_to_string(mod_path.clone()).expect("Unable to read file");
+            let input = input.as_ref();
+            let (r, tokbuf) = crate::lex::lex(input).expect("expr failed lexing");
+            let (r, ast) = crate::parse::p_defs(tokbuf).expect("expr failed parsing");
+            let tenv = typecheck::check_program(mod_path.clone(), ast.clone())?;
+            let imported_env = interp_program(mod_path, ast)?;
+            Ok(env.union(imported_env))
+        }
+        _ => Ok(env),
+    }
 }
 
 fn interp_fn_defs(denv: DefFnEnv, def: &Box<Annotated<Defn>>) -> DefFnEnv {
