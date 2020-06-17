@@ -1,4 +1,5 @@
-use crate::data::Value;
+use crate::data::{Type, Expr, Value};
+use colored::Colorize;
 use std::error;
 use std::fmt::{self, Formatter};
 use std::fs;
@@ -9,16 +10,9 @@ use nom::error::{
     ParseError as NomParseError,
 };
 
-// #[derive(Debug, Clone)]
-// pub struct InterpError {
-//     pub kind: InterpErrorKind,
-//     pub idx: usize,
-//     pub len: usize,
-//     pub loc: Option<String>,
-// }
-
-pub type InterpError = AnnotatedError<InterpErrorKind>;
 pub type ParseError = AnnotatedError<ParseErrorKind>;
+pub type TypeError = AnnotatedError<TypeErrorKind>;
+pub type InterpError = AnnotatedError<InterpErrorKind>;
 
 #[derive(Debug, Clone)]
 pub struct AnnotatedError<ErrorKind> {
@@ -28,9 +22,10 @@ pub struct AnnotatedError<ErrorKind> {
     pub loc: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum InterpErrorKind {
-    TypeError,
+    TypeError, // TODO: DynamicTypeError
+    StaticTypeError(TypeErrorKind),
     UndefinedError(String),
     DerefError(Value),
     MissingFieldError(String),
@@ -39,16 +34,70 @@ pub enum InterpErrorKind {
     UnimplementedBehavior,
 }
 
-impl fmt::Display for InterpError {
+#[derive(Debug, Clone, PartialEq)]
+pub enum TypeErrorKind {
+    TempFiller(i32),
+    UndefinedError(String),
+    ApplicationError(Type/*func*/, Type/*arg*/),
+    DerefError(Type),
+    MissingFieldError(String),
+    ExtraFieldError(String),
+    UnexpectedTypeError(/*expected*/Type, /*actual*/ Type),
+    UnimplementedBehavior,
+}
+
+#[derive(Debug, Clone)]
+pub enum ParseErrorKind {
+    NomError(NomErrorKind),
+    GenericError
+}
+
+impl fmt::Display for TypeErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use TypeErrorKind::*;
+        match self.clone() {
+            TypeErrorKind::ApplicationError(func, arg) => {
+                let func = format!("{}", func);
+                let arg = format!("{}", arg);
+                write!(f, "Application Error:\nfunction ({}) was given\nargument ({})\n\t", func.blue(), arg.red())
+            }
+            TypeErrorKind::UnexpectedTypeError(exp, act) => {
+                let exp = format!("{}", exp);
+                let act = format!("{}", act);
+                write!(f, "Application Error:\nexpected ({})\nactual   ({})\n\t", exp.blue(), act.red())
+            }
+            _ => write!(f, "{:?}", self)
+        }
+    }
+}
+
+impl fmt::Display for InterpErrorKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         use InterpErrorKind::*;
+        match self.clone() {
+            TypeError => write!(f, "Type Error"),
+            UndefinedError(name) => write!(f, "Undefined variable \"{}\"", name),
+            DerefError(value) => write!(f, "Value cannot be dereferenced \"{}\"", value),
+            x => write!(f, "{:?}", x),
+        }
+    }
+}
 
-        let err_msg: String = match self.kind.clone() {
-            TypeError => format!("Type Error"),
-            UndefinedError(name) => format!("Undefined variable \"{}\"", name),
-            DerefError(value) => format!("Value cannot be dereferenced \"{}\"", value),
-            x => format!("{:?}", x),
-        };
+impl fmt::Display for ParseErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        match self.clone() {
+            ParseErrorKind::NomError(e) => write!(f, "nom error: {:?}", e),
+            ParseErrorKind::GenericError => write!(f, "generic error"),
+            x => write!(f, "{:?}", x),
+        }
+    }
+}
+
+impl<T: fmt::Display + Clone> fmt::Display for AnnotatedError<T> {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use ParseErrorKind::*;
+
+        let err_msg = format!("{}", self.kind.clone());
 
         match self.loc.clone() {
             Some(loc) => {
@@ -70,32 +119,10 @@ impl error::Error for InterpError {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ParseErrorKind {
-    NomError(NomErrorKind),
-    GenericError
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        use ParseErrorKind::*;
-
-        let err_msg: String = match self.kind.clone() {
-            ParseErrorKind::NomError(e) => format!("nom error: {:?}", e),
-            ParseErrorKind::GenericError => format!("generic error"),
-            x => format!("{:?}", x),
-        };
-
-        match self.loc.clone() {
-            Some(loc) => {
-                let contents = fs::read_to_string(loc.as_str())
-                    .expect(&format!("Unable to read file \"{}\"", loc));
-                let line = calc_line(&self, &contents);
-                let snippet = display_from_file(&contents, self.idx, self.len, line);
-                write!(f, "{} at line {}\n{}", err_msg, line, snippet)
-            }
-            None => write!(f, "{} in <unknown file>", err_msg),
-        }
+impl error::Error for TypeError {
+    fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+        // Generic error, underlying cause isn't tracked.
+        None
     }
 }
 
@@ -105,17 +132,6 @@ impl error::Error for ParseError {
         None
     }
 }
-
-// impl Into<ParseError> for (crate::lex::TokenBuffer, NomErrorKind) {
-//     fn into(self) -> ParseError {
-//         AnnotatedError {
-//             kind: ParseErrorKind::NomError(self.1),
-//             idx: self.0.first().map_or(0, |x| x.idx),
-//             len: self.0.last().map_or(0, |x| x.len),
-//             loc: None,
-//         }
-//     }
-// }
 
 impl From<(crate::lex::TokenBuffer, NomErrorKind)> for ParseError {
     fn from(error: (crate::lex::TokenBuffer, NomErrorKind)) -> Self {
@@ -128,23 +144,36 @@ impl From<(crate::lex::TokenBuffer, NomErrorKind)> for ParseError {
     }
 }
 
+impl From<TypeError> for InterpError {
+    fn from(error: TypeError) -> Self {
+        AnnotatedError {
+            kind: InterpErrorKind::StaticTypeError(error.kind),
+            idx: error.idx,
+            len: error.len,
+            loc: error.loc,
+        }
+    }
+}
+
 fn calc_line<T>(err: &AnnotatedError<T>, contents: &String) -> usize {
     let idx_out_of_bounds = format!("Error position out of bounds for file: {:?}", err.loc);
     let lines: Vec<&str> = contents.split('\n').collect();
     let mut curr_pos = 0;
     let mut line_num = 0;
     while curr_pos < err.idx {
-        line_num += 1;
-        curr_pos += lines
-            .get(line_num - 1)
-            .expect(idx_out_of_bounds.as_ref())
-            .len();
+        match lines.get(line_num) {
+            Some(line) => {
+                curr_pos += line.len();
+                line_num += 1;
+            }
+            None => break
+        }
     }
-    line_num
+    line_num - 1
 }
 
 fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize) -> String {
-    let mut line_num = line_num - 1;
+    let mut line_num = line_num;
     let contents = contents.as_bytes();
     let contents = &contents[idx..(idx + len)];
     let contents =
@@ -153,14 +182,10 @@ fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize)
         .lines()
         .map(|line| {
             line_num += 1;
-            format!("{:?}.\t{}\n", line_num, line)
+            format!("{:?}.\t{}\n", line_num - 1, line)
         })
         .collect::<String>()
         .trim_end_matches('\n')
         .to_owned();
-    // TODO: This doesn't fix display from file problem for some reason
-    // let start = idx.min(contents.len() - 1);
-    // let end = (idx + len).min(contents.len() - 1);
-    // let contents = &contents[start..end];
     contents
 }

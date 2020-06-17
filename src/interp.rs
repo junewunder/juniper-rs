@@ -1,14 +1,18 @@
 use crate::annotate::Annotated;
 use crate::data::*;
 use crate::error::*;
+use crate::typecheck;
 use im::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::path::PathBuf;
 
 type DefFnEnv = HashMap<String, (String, Box<Annotated<Expr>>)>;
 pub type InterpResult = std::result::Result<Value, InterpError>;
 
-pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
+pub fn interp_program(filename: PathBuf, defs: Vec<Box<Annotated<Defn>>>) -> Result<Env, InterpError> {
+    // println!("HELLLOOOO INTERP PROGRAM", );
+
     let mut env: Env = vec![
         ("delay".into(), Value::PrimV("delay".into())),
         ("print".into(), Value::PrimV("print".into())),
@@ -18,32 +22,74 @@ pub fn interp_program(defs: Vec<Box<Annotated<Defn>>>) -> InterpResult {
     .into_iter()
     .collect();
 
+    let env = defs.iter().try_fold(env, |acc, d| interp_imports(filename.clone(), acc, d))?;
     let env = defs.iter().fold(env, interp_scopeless_defs);
+    let env_rc = Rc::new(env);
+    let mut env_mut = env_rc.clone();
+    let env_ptr = unsafe { Rc::get_mut_unchecked(&mut env_mut) };
+    let denv: DefFnEnv = defs.iter().fold(HashMap::new(), interp_fn_defs);
 
-    let env_cell = RefCell::new(env);
-    let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
-
-    let denv: DefFnEnv = defs.into_iter().fold(HashMap::new(), interp_fn_defs);
     for (name, (arg, body)) in denv.into_iter() {
-        env_cell.borrow_mut().insert(
+        env_ptr.insert(
             name.clone(),
             Value::CloV(Some(name), arg, body, env_rc.clone()),
         );
     }
 
-    // println!("{}", print_env_safe(&env_rc));
-    if let Some(Value::CloV(_, arg, body, env)) = env_rc.get("main".into()) {
-        return interp_expr(body.clone(), &env);
+    for def in defs.iter() {
+        if let Some((name, value)) = interp_val_def(def, &env_rc) {
+            env_ptr.insert(name, value?);
+        }
     }
 
-    panic!("no <main> method")
+    Ok((*env_rc.clone()).clone())
 }
 
-fn interp_fn_defs(denv: DefFnEnv, def: Box<Annotated<Defn>>) -> DefFnEnv {
-    use Defn::*;
-    match def.unwrap() {
-        FnD(name, x, expr) => denv.update(name, (x, expr)),
+fn interp_imports(filename: PathBuf, env: Env, def: &Box<Annotated<Defn>>) -> Result<Env, InterpError> {
+    match def.clone().unwrap() {
+        Defn::ImportD(path) => {
+            let mut mod_path = PathBuf::from(filename);
+            mod_path.pop();
+            mod_path.push(path);
+            mod_path.set_extension("juni");
+
+
+            println!("{:?}", mod_path);
+            let input = std::fs::read_to_string(mod_path.clone()).expect("Unable to read file");
+            let input = input.as_ref();
+            let (r, tokbuf) = crate::lex::lex(input).expect("expr failed lexing");
+            let (r, ast) = crate::parse::p_defs(tokbuf).expect("expr failed parsing");
+            let tenv = typecheck::check_program(mod_path.clone(), ast.clone())?;
+            let imported_env = interp_program(mod_path, ast)?;
+            Ok(env.union(imported_env))
+        }
+        _ => Ok(env),
+    }
+}
+
+fn interp_fn_defs(denv: DefFnEnv, def: &Box<Annotated<Defn>>) -> DefFnEnv {
+    match def.clone().unwrap() {
+        Defn::VarD(name, mut xs, rt, body) if xs.len() > 0 => {
+            let mut ts = typecheck::drill(rt).clone().into_iter().collect::<Vec<_>>();
+            let x = xs.remove(0);
+            let t = ts.remove(0);
+            let mut xt_s = xs.iter().zip(ts);
+            let e = xt_s.rev().fold(body, |acc, (x, t)| {
+                let next = Expr::FnE(None, x.clone(), t.clone(), acc);
+                Box::new(Annotated::zero(next))
+            });
+            denv.update(name, (x.clone(), e))
+        },
         _ => denv,
+    }
+}
+
+fn interp_val_def(def: &Box<Annotated<Defn>>, env: &Env) -> Option<(String, InterpResult)> {
+    match def.clone().unwrap() {
+        Defn::VarD(name, xs, rt, body) if xs.len() == 0 => {
+            Some((name, interp_expr(body, env)))
+        },
+        _ => None,
     }
 }
 
@@ -51,31 +97,35 @@ fn interp_scopeless_defs(env: Env, def: &Box<Annotated<Defn>>) -> Env {
     use Defn::*;
     use Value::*;
     match def.cloned() {
-        StructD(name, fields) => {
+        StructD(name, _, fields) => {
             env.update(name.clone(), Value::StructV(name.clone(), fields.clone()))
         }
-        PrimD(name, mut xs) => {
-            let app = box Expr::AppPrimE(name.clone(), xs.clone());
-            let arg0 = xs.remove(0);
-            let body = xs.iter().fold(box Annotated::zero(*app), |acc, x| {
-                box Annotated::zero(Expr::FnE(None, x.into(), acc))
-            });
-            env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
-        }
-        EnumD(enum_name, variants) => variants.iter().fold(env, |env, (name, xs)| {
-            if xs.len() == 0 {
+        // PrimD(name, mut xs) => {
+        //     let app = box Expr::AppPrimE(name.clone(), xs.clone());
+        //     let arg0 = xs.remove(0);
+        //     let body = xs.iter().fold(box Annotated::zero(*app), |acc, x| {
+        //         box Annotated::zero(Expr::FnE(None, x.into(), acc))
+        //     });
+        //     env.update(name, CloV(None, arg0, body, Rc::new(HashMap::new())))
+        // }
+        Defn::EnumD(enum_name, _, variants) => variants.iter().fold(env, |env, (name, ts)| {
+            if ts.len() == 0 {
                 return env.update(
                     name.clone(),
                     Value::EnumV(enum_name.clone(), name.clone(), Vec::with_capacity(0)),
                 );
             }
-            let mut xs = xs.clone();
+            let mut xs = ts.clone().iter()
+                .enumerate()
+                .map(|(i, x)| format!("{}{}", x, i))
+                .collect::<Vec<String>>();
             let init_enum_var = Expr::InitEnumVariantE(enum_name.clone(), name.clone(), xs.clone());
             let arg0 = xs.remove(0);
             let body = xs
                 .iter()
-                .fold(box Annotated::zero(init_enum_var), |acc, x| {
-                    box Annotated::zero(Expr::FnE(None, x.into(), acc))
+                .zip(ts)
+                .fold(box Annotated::zero(init_enum_var), |acc, (x, t)| {
+                    box Annotated::zero(Expr::FnE(None, x.clone(), t.clone(), acc))
                 });
             env.update(
                 name.clone(),
@@ -163,7 +213,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             _ => err!(TypeError),
         },
         Expr::StringE(s) => Ok(Value::StringV(s)),
-        Expr::NullE => Ok(NullV),
+        Expr::UnitE => Ok(UnitV),
         Expr::VarE(x) => env.get(&x).cloned().ok_or_else(|| InterpError {
             kind: UndefinedError(x),
             idx: err_idx,
@@ -186,7 +236,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             if let MutV(x) = interp(xe, env)? {
                 x.replace(Box::new(v));
             }
-            Ok(NullV)
+            Ok(UnitV)
         }
         Expr::DerefE(e) => {
             let v = interp(e, env)?;
@@ -200,7 +250,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             interp(e1, env)?;
             interp(e2, env)
         }
-        Expr::FnE(name, x, body) => match name {
+        Expr::FnE(name, x, t, body) => match name {
             Some(name) => {
                 let env_cell = RefCell::new(env.clone());
                 let env_rc = unsafe { Rc::from_raw(env_cell.as_ptr()) };
@@ -232,33 +282,34 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
                 };
                 interp(body.clone(), env)?;
             }
-            Ok(Value::NullV)
+            Ok(Value::UnitV)
         }
         Expr::InitObjectE(fields) => {
             let mut field_vs = HashMap::new();
             for (x, e) in fields.into_iter() {
-                field_vs.insert(x, Rc::new(interp(e, env)?));
+                field_vs.insert(x, interp(e, env)?);
             }
 
             Ok(ObjectV(None, field_vs))
         }
         Expr::InitStructE(name, fields) => {
+            // TODO: simplify now that this is being checked for in type system
             let allowed_fields = match env.get(&name) {
                 Some(StructV(name, fields)) => fields,
                 _ => return err!(UndefinedError(name)),
             };
             let mut field_vs = HashMap::new();
             for (x, e) in fields.into_iter() {
-                if !allowed_fields.contains(&x) {
+                if !allowed_fields.contains_key(&x) {
                     return err!(ExtraFieldError(x));
                 }
-                field_vs.insert(x, Rc::new(interp(e, env)?));
+                field_vs.insert(x, interp(e, env)?);
             }
 
             let keys: Vec<&String> = field_vs.keys().collect();
             for x in allowed_fields.iter() {
-                if !keys.contains(&x) {
-                    return err!(MissingFieldError(x.clone()));
+                if !keys.contains(&x.0) {
+                    return err!(MissingFieldError(x.0.clone()));
                 }
             }
 
@@ -282,7 +333,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
                 _ => return err!(TypeError),
             };
 
-            Ok(RefV(v))
+            Ok(v.clone()) // previously: Ok(RefV(v))
         }
         Expr::MatchE(subject, patterns) => {
             use MatchPattern::*;
@@ -296,6 +347,7 @@ pub fn interp_expr(e: Box<Annotated<Expr>>, env: &Env) -> InterpResult {
             }
             err!(NoMatchError(subject))
         }
+        Expr::TypeAnnotationE(e, t) => interp(e, env),
         _ => err!(UnimplementedBehavior),
     }
 }
@@ -345,7 +397,7 @@ fn interp_prim(name: String, values: Vec<Value>) -> InterpResult {
             if let Some(NumV(n)) = values.first() {
                 let ten_millis = time::Duration::from_millis(*n as u64);
                 thread::sleep(ten_millis);
-                Ok(NullV)
+                Ok(UnitV)
             } else {
                 Ok(PrimV("delay".into()))
             }

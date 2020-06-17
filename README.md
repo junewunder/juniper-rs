@@ -4,9 +4,6 @@ This is a toy programming language that I plan on using to add fun features to a
 
 An interesting part of this repository is a mixfix parser (located in `src/mixfix/mixfix.rs`). [The algorithm was copied from here.](https://github.com/uvm-plaid/uvmhs/blob/master/src/UVMHS/Lib/Parser/Mixfix.hs)
 
-## questions
- - how to do implement no-arg functions like `random`
-
 ## features so far:
 
  - bools, numbers, strings
@@ -19,13 +16,37 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 
 ## features to do:
 
- - error reporting on parsing
+ - traits
  - modules
- - top level constants -> create BlockV which is closure but without arguments
+ - type inference
+ - parser errors
+
  - REPL functionality
+ - scoped types?
  - parse values from command line to main function
  - detect when mut value is trying to be used without being dereferenced
- - use Weak reference counting in CloV
- - strange out-of-bounds error when interp error is found on last line of file
  - mutable struct values
- - optional typing in struct values
+ - bug: variable names that start with keywords can't be parsed
+
+## plan for generics
+add types GenericT(t, var) and ConcreteT(t, val)
+assume there is a type: T x y z, which should be instantiated to T num string bool
+ - x = num
+ - y = string
+ - z = bool
+then the type AST will be
+```
+ConcreteT(
+  ConcreteT(
+    ConcreteT(
+      GenericT(
+        GenericT(
+          GenericT(
+              ...T...
+            , "z")
+          , "y")
+        , "x")
+      , num)
+    , string)
+  , bool)
+```

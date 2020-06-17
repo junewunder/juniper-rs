@@ -1,0 +1,48 @@
+enum List T {
+  Root,
+  Cons(T, List T),
+}
+
+isnil T : List T -> bool;
+isnil xs =  {
+  match xs {
+    ::Root => true,
+    Cons(_, _) => false,
+  }
+}
+
+map A B : (A -> B) -> List A -> List B;
+map f xs = {
+  match xs {
+    ::Root => Root<B>,
+    Cons(x, xs) => Cons<B> (f x) (map<A, B> f xs)
+  }
+}
+
+foldr A B : (A -> B -> B) -> B -> List A -> B;
+foldr f b as = {
+  match as {
+    Cons(a, ::Root) => f a b,
+    Cons(a, as) => foldr<A, B> f (f a b) as,
+  }
+}
+
+foldl A B : (A -> B -> B) -> B -> List A -> B;
+foldl f b as = {
+  match as {
+    Cons(a, ::Root) => f a b,
+    Cons(a, as) => f a (foldl<A, B> f b as),
+  }
+}
+
+plus : num -> num -> num;
+plus a b = { a + b }
+
+main : () -> any;
+main () = {
+  let list = Cons<num> 1 (Cons<num> 2 (Cons<num> 3 Root<num>)) in (
+    map<num, num> (plus 1) list;
+    foldr<num, num> plus 0 list;
+    foldl<num, num> plus 0 list;
+  )
+}

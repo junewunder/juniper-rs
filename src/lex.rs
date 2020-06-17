@@ -10,8 +10,10 @@ use nom::combinator::map;
 use nom::combinator::not;
 use nom::combinator::opt;
 use nom::combinator::value;
+use nom::combinator::peek;
 use nom::error::{ErrorKind, ParseError};
 use nom::number::complete::double;
+use nom::sequence::pair;
 use nom::Err;
 use nom::InputIter;
 use nom::{
@@ -102,7 +104,7 @@ fn p_comment(input: &str) -> IResult<&str, Token> {
 pub fn p_reserved(input: &str) -> IResult<&str, Token> {
     let reserved = (
         map(
-            alt((
+            pair(alt((
                 tag("if"),
                 tag("then"),
                 tag("else"),
@@ -115,15 +117,21 @@ pub fn p_reserved(input: &str) -> IResult<&str, Token> {
                 tag("struct"),
                 tag("enum"),
                 tag("match"),
-            )),
-            |x: &str| Token::Keywd(x.into()),
+                tag("import"),
+            )), peek(not(alt((alpha1, is_a("_")))))),
+            |(x, _): (&str, _)| Token::Keywd(x.into()),
         ),
-        map(alt((tag("true"), tag("false"))), |x: &str| {
-            Token::Prim(x.into())
-        }),
+        map(
+            pair(alt((
+                tag("true"), tag("false"),
+                tag("num"), tag("bool"), tag("unit"), tag("string"), tag("any"),
+            )), peek(not(alt((alpha1, is_a("_")))))),
+            |(x, _): (&str, _)| Token::Prim(x.into())
+        ),
         map(
             alt((
                 tag("=>"),
+                tag("->"),
                 tag("&&"),
                 tag("||"),
                 tag("=="),
@@ -202,6 +210,22 @@ pub fn take_ident(input: TokenBuffer) -> IResult<TokenBuffer, String> {
 
     if let Token::Ident(ident) = t.remove(0).tok {
         return Ok((t, ident.clone()));
+    };
+
+    let e: ErrorKind = ErrorKind::TakeTill1;
+    Err(Err::Error(ParseError::from_error_kind(input, e)))
+}
+
+pub fn take_string(input: TokenBuffer) -> IResult<TokenBuffer, String> {
+    let mut t = input.clone();
+
+    if input.len() == 0 {
+        let e: ErrorKind = ErrorKind::TakeTill1;
+        return Err(Err::Error(ParseError::from_error_kind(input, e)));
+    };
+
+    if let Token::Str(string) = t.remove(0).tok {
+        return Ok((t, string.clone()));
     };
 
     let e: ErrorKind = ErrorKind::TakeTill1;

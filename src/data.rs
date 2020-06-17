@@ -4,15 +4,18 @@ use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display};
 use std::rc::Rc;
 
+pub type Env = HashMap<String, Value>;
+pub type TEnv = HashMap<String, Type>;
 type Wrap<T> = Box<Annotated<T>>;
-type StructFields = Vec<String>;
+type StructFields = HashMap<String, Type>;
 
 #[derive(Clone, Debug)]
 pub enum Defn {
-    FnD(String, String, Wrap<Expr>),
+    VarD(String, Vec<String>, Type, Wrap<Expr>),
     PrimD(String, Vec<String>),
-    StructD(String, Vec<String>),
-    EnumD(String, HashMap<String, Vec<String>>),
+    StructD(String, Vec<String>/*generics*/, StructFields),
+    EnumD(String, Vec<String>/*generics*/, HashMap<String, Vec<Type>>),
+    ImportD(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -33,18 +36,17 @@ pub enum Expr {
     IfE(Wrap<Expr>, Wrap<Expr>, Wrap<Expr>),
 
     StringE(String),
-    NullE,
+    UnitE,
 
     VarE(String),
     LetE(String, Wrap<Expr>, Wrap<Expr>),
 
-    FnE(Option<String>, String, Wrap<Expr>),
+    FnE(Option<String>, String, Type, Wrap<Expr>),
     AppE(Wrap<Expr>, Wrap<Expr>),
     AppPrimE(String, Vec<String>),
 
     SeqE(Wrap<Expr>, Wrap<Expr>),
 
-    NewE(Wrap<Expr>, Vec<(String, Wrap<Expr>)>),
     AccessE(Wrap<Expr>, String),
 
     WhileE(Wrap<Expr>, Wrap<Expr>),
@@ -57,6 +59,8 @@ pub enum Expr {
     InitEnumVariantE(String, String, Vec<String>),
 
     MatchE(Wrap<Expr>, Vec<(MatchPattern, Wrap<Expr>)>),
+
+    TypeAnnotationE(Wrap<Expr>, Type),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -76,24 +80,29 @@ pub enum Value {
     RefV(Rc<Value>),
     PrimV(String),
     StructV(String, StructFields),
-    ObjectV(Option<String>, HashMap<String, Rc<Value>>),
+    ObjectV(Option<String>, HashMap<String, Value>),
     CloV(Option<String>, String, Wrap<Expr>, Rc<Env>),
     EnumV(String, String, Vec<Value>),
-    NullV,
+    UnitV,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Type {
+    TypeVar(String),
+    GenericT(Box<Type>, String /*var*/),
+    ConcreteT(Box<Type>, Box<Type> /*value*/),
     NumT,
     BoolT,
     StringT,
+    AnyT, // TODO: Remove after type parameterization
+    UnitT,
     MutT(Box<Type>),
+    RefT(Box<Type>),
     PrimT,
-    CloT,
-    NullT,
-    AnyT,
-    ObjectT,
-    StructT(String),
+    CloT(Box<Type>, Box<Type>),
+    ObjectT(HashMap<String, Type>),
+    StructT(String, StructFields),
+    EnumT(String, HashMap<String, Vec<Type>>),
 }
 
 impl Display for Value {
@@ -107,8 +116,9 @@ impl Display for Value {
             RefV(m) => write!(f, "ref {}", *m),
             PrimV(p) => write!(f, "<prim {}>", p),
             CloV(name, arg, expr, env) => {
+                let arg = if arg == "_" { "()" } else { arg };
                 let name = name.clone().unwrap_or("{anon}".to_string());
-                write!(f, "<fn {} :: {} {}>", name, arg, print_env_safe(env))
+                write!(f, "<fn {} : {} {}>", name, arg, print_env(env))
             }
             ObjectV(name, fields) => {
                 let name = name
@@ -133,24 +143,126 @@ impl Display for Value {
                 }
                 write!(f, "{}::{}{}", enum_name, variant, args_str)
             }
-            NullV => write!(f, "null"),
+            UnitV => write!(f, "unit"),
             x => write!(f, "{:?}", x),
         }
     }
 }
 
-pub fn print_env_safe(env: &Rc<Env>) -> String {
-    let mut env_str = format!("{{ ");
-    for (k, v) in env.iter() {
-        match v {
-            Value::CloV(_, arg, _, _) => env_str = format!("{}{}: <fn {}>, ", env_str, k, arg),
-            _ => env_str = format!("{}: {}, ", k, v),
+impl Display for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use Type::*;
+        match self {
+            NumT => write!(f, "num"),
+            BoolT => write!(f, "bool"),
+            StringT => write!(f, "string"),
+            UnitT => write!(f, "()"),
+            AnyT => write!(f, "any"),
+            TypeVar(name) => write!(f, "{}", name),
+            MutT(m) => write!(f, "mut {}", m),
+            RefT(m) => write!(f, "ref {}", m),
+            CloT(box CloT(ii, io), o) => write!(f, "({} -> {}) -> {}", ii, io, o),
+            CloT(i, o) => write!(f, "{} -> {}", i, o),
+            GenericT(t, name) => write!(f, "∀ {}. ({})", name, t),
+            ConcreteT(t1, t2) => write!(f, "{} {}", t1, t2),
+            EnumT(name, fields) => {
+                let mut fields = fields.clone().into_iter()
+                    .map(|(k, ts)| { format!("{} {}, ", k, ts.iter().map(|t| format!("{} ", t)).collect::<String>()) })
+                    .collect::<Vec<_>>();
+                fields.sort();
+                let fields = fields.into_iter().collect::<String>();
+                write!(f, "enum {} {{ {} }}", name, fields.trim_end_matches(" , "))
+            },
+            StructT(name, _) => write!(f, "struct {}", name),
+            x => write!(f, "{:?}", x),
         }
     }
-    env_str.trim_end_matches(", ");
-    format!("{} }}", env_str)
 }
 
-pub type Env = HashMap<String, Value>;
+// TODO make this the fn_iter method instead of this
+impl IntoIterator for Type {
+    type Item = Type;
+    type IntoIter = TypeIterator;
 
-pub type Store = HashMap<i32, Value>;
+    fn into_iter(self) -> Self::IntoIter {
+        TypeIterator{ cur: Some(self) }
+    }
+}
+
+impl std::iter::FromIterator<Type> for Type {
+    fn from_iter<T>(iter: T) -> Self
+        where T: IntoIterator<Item = Type>
+    {
+        let mut out: Option<Type> = None;
+
+        for next in iter {
+            match out {
+                Some(cur) => out = Some(Type::CloT(Box::new(cur), Box::new(next))),
+                None => out = Some(next)
+            }
+        }
+        out.unwrap_or(Type::UnitT)
+    }
+}
+
+pub struct TypeIterator {
+    cur: Option<Type>
+}
+
+impl Iterator for TypeIterator {
+    type Item = Type;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.cur.clone() {
+            Some(Type::CloT(t, rt)) => {
+                self.cur = Some(*rt.clone());
+                Some(*t)
+            }
+            Some(t) => {
+                self.cur = None;
+                Some(t)
+            }
+            None => None,
+        }
+    }
+}
+
+// impl Type {
+//     pub fn to_vec(&self) -> Vec<Type> {
+//         match self {
+//             Type::CloT(t, rt) => {
+//                 let out = Vec::new();
+//                 out.push(*t.clone());
+//                 out.append(&mut rt.to_vec());
+//                 out
+//             },
+//             _ => Vec::
+//         }
+//     }
+// }
+
+pub fn print_tenv(env: &TEnv) -> String {
+    let mut env_str = format!("tenv {{ ");
+    for (k, v) in env.iter() {
+        env_str += &format!("\n    {}: {}, ", k, v)
+    }
+    env_str = env_str.trim_end_matches(", ").into();
+    env_str + "\n}"
+}
+
+pub fn print_env(env: &Env) -> String {
+    let mut env_str = format!("env {{ ");
+    for (k, v) in env.iter() {
+        match v {
+            Value::CloV(_, arg, _, _) if arg == "_" => {
+                env_str += &format!("\n    {}: <fn ()>, ", k)
+            }
+            Value::CloV(_, arg, _, _) => {
+                env_str += &format!("\n    {}: <fn {}>, ", k, arg)
+            }
+            Value::PrimV(_) => (), // THIS MAKES PRIMS NOT BE PRINTED
+            _ => env_str += &format!("\n    {}: {}, ", k, v),
+        }
+    }
+    env_str = env_str.trim_end_matches(", ").into();
+    env_str + "\n}"
+}

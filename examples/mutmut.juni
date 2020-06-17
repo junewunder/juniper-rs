@@ -1,0 +1,46 @@
+struct Boop {
+  val: mut num,
+  immut: num,
+}
+
+addOne : mut num -> ()
+addOne n = {
+  !n = (*n) + 1;
+}
+
+main : () -> any
+main () = {
+  mut x = 0 in
+  mut y = 1 in
+  mut hide = x in (
+    print hide;
+    addOne x;
+    print hide;
+    addOne (*hide);
+    print hide;
+    !hide = y;
+    print hide;
+  );
+
+  print "";
+
+  # this is not exactly intended behavior...
+  # mut x = 0 in
+  # mut y = 2 in
+  # let boop = Boop { val: x, immut: 1 } in (
+  #   print boop;
+  #   addOne boop.val;
+  #   print boop;
+  #   !*(boop.val) = y;
+  #   print boop;
+  #   !boop.immut = x;
+  # );
+  # 
+  # print "";
+  # 
+  # let rock = 0 in (
+  #   print rock;
+  #   !rock = 1
+  #   print rock;
+  # )
+}

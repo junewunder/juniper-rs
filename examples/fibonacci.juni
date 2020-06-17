@@ -1,11 +1,18 @@
-fn fib :: n =>
+MEANING_OF_LIFE : num;
+MEANING_OF_LIFE = { 42 }
+
+fib : num -> num;
+fib n = {
   if n < 2 then n
   else (fib (n - 1)) + (fib (n - 2))
+}
 
-fn main :: x =>
+main : () -> any;
+main () = {
   mut i = 0 in
   while true => (
-    print (fib *i);
-    !i = *i + 1;
+    print (fib (*i));
+    !i = (*i) + 1;
     delay 500
   )
+}
