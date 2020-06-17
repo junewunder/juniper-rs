@@ -15,6 +15,7 @@ pub enum Defn {
     PrimD(String, Vec<String>),
     StructD(String, Vec<String>/*generics*/, StructFields),
     EnumD(String, Vec<String>/*generics*/, HashMap<String, Vec<Type>>),
+    ImportD(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -248,7 +249,7 @@ pub fn print_tenv(env: &TEnv) -> String {
     env_str + "\n}"
 }
 
-pub fn print_env(env: &Rc<Env>) -> String {
+pub fn print_env(env: &Env) -> String {
     let mut env_str = format!("env {{ ");
     for (k, v) in env.iter() {
         match v {
