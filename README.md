@@ -4,11 +4,6 @@ This is a toy programming language that I plan on using to add fun features to a
 
 An interesting part of this repository is a mixfix parser (located in `src/mixfix/mixfix.rs`). [The algorithm was copied from here.](https://github.com/uvm-plaid/uvmhs/blob/master/src/UVMHS/Lib/Parser/Mixfix.hs)
 
-## questions
- - how to do implement no-arg functions like `random`
- - how to typecheck with mutual recursion??
- - .....how bad would it be to implement algorithm W....
-
 ## features so far:
 
  - bools, numbers, strings
