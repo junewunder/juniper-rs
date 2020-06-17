@@ -1,0 +1,18 @@
+enum Union X Y {
+  Left(X),
+  Right(Y),
+}
+
+inl X Y : X -> Union X Y;
+inl x = { Left<X, Y> x }
+
+inr X Y : Y -> Union X Y;
+inr y = { Right<X, Y> y }
+
+to_single X Y Z : (X -> Z) -> (Y -> Z) -> Union X Y -> Z;
+to_single fx fy u = {
+  match u {
+    Left(x) => fx x,
+    Right(y) => fy y,
+  }
+}

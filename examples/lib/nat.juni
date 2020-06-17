@@ -28,19 +28,3 @@ to_nat n = {
   else
     Zero
 }
-
-main : () -> any;
-main () = {
-  mut i = 0 in
-  while (*i) < 10 => (
-    let n = to_nat (*i) in
-    print (
-      "" + (*i) + (
-        if (is_even (to_nat (*i))) then " is even"
-        else if (is_odd (to_nat (*i))) then " is odd"
-        else " lmao wtf WHAT"
-      )
-    );
-    !i = (*i) + 1;
-  )
-}

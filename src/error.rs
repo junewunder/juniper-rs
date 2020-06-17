@@ -1,4 +1,5 @@
 use crate::data::{Type, Expr, Value};
+use colored::Colorize;
 use std::error;
 use std::fmt::{self, Formatter};
 use std::fs;
@@ -37,7 +38,7 @@ pub enum InterpErrorKind {
 pub enum TypeErrorKind {
     TempFiller(i32),
     UndefinedError(String),
-    ApplicationError(Type, Type),
+    ApplicationError(Type/*func*/, Type/*arg*/),
     DerefError(Type),
     MissingFieldError(String),
     ExtraFieldError(String),
@@ -53,8 +54,20 @@ pub enum ParseErrorKind {
 
 impl fmt::Display for TypeErrorKind {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        use InterpErrorKind::*;
-        write!(f, "{:?}", self)
+        use TypeErrorKind::*;
+        match self.clone() {
+            TypeErrorKind::ApplicationError(func, arg) => {
+                let func = format!("{}", func);
+                let arg = format!("{}", arg);
+                write!(f, "Application Error:\nfunction ({}) was given\nargument ({})\n\t", func.blue(), arg.red())
+            }
+            TypeErrorKind::UnexpectedTypeError(exp, act) => {
+                let exp = format!("{}", exp);
+                let act = format!("{}", act);
+                write!(f, "Application Error:\nexpected ({})\nactual   ({})\n\t", exp.blue(), act.red())
+            }
+            _ => write!(f, "{:?}", self)
+        }
     }
 }
 
@@ -156,7 +169,7 @@ fn calc_line<T>(err: &AnnotatedError<T>, contents: &String) -> usize {
             None => break
         }
     }
-    line_num
+    line_num - 1
 }
 
 fn display_from_file(contents: &String, idx: usize, len: usize, line_num: usize) -> String {

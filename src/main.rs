@@ -1,6 +1,7 @@
 #![feature(type_alias_impl_trait)]
 #![feature(trait_alias)]
 #![feature(box_syntax)]
+#![feature(box_patterns)]
 #![feature(get_mut_unchecked)]
 #![allow(unused)]
 
@@ -12,6 +13,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate clap;
 extern crate rand;
+extern crate colored;
 
 mod annotate;
 mod data;
@@ -27,10 +29,12 @@ use crate::data::Defn;
 use crate::error::TypeError;
 use crate::lex::TokenBuffer;
 use crate::parse::ExprIResult;
+use colored::*;
 use nom::IResult;
 use clap::Clap;
 use data::*;
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(Clap, Debug)]
 struct Opts {
@@ -53,6 +57,12 @@ struct Opts {
 
 fn main() {
     let opts: Opts = Opts::parse();
+    println!("{}", parse_type("num"));
+    println!("{}", parse_type("A"));
+    println!("{}", parse_type("A -> B"));
+    println!("{}", parse_type("A -> B -> C"));
+    println!("{}", parse_type("A -> (B -> C) -> D"));
+    println!("{}", parse_type("A -> (B -> C) -> (D -> (E -> F) -> G) -> H"));
 
     if opts.lex {
         let input = fs::read_to_string(opts.target.as_str()).expect("Unable to read file");
@@ -89,11 +99,19 @@ fn main() {
 fn interp_from_file(filename: &str) -> interp::InterpResult {
     let input = fs::read_to_string(filename).expect("Unable to read file");
     let input = input.as_ref();
-    let filename = String::from(filename);
+    let filename = PathBuf::from(filename);
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
-    let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
-    let tenv = typecheck::check_program(ast.clone())?;
-    interp::interp_program(ast)
+    let (r, mut ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
+    let tenv = typecheck::check_program(filename.clone(), ast.clone())?;
+    let env = interp::interp_program(filename, ast)?;
+
+    println!("{}", print_tenv(&tenv));
+    println!("{}", print_env(&env));
+    if let Some(Value::CloV(_, arg, body, env)) = env.get("main".into()) {
+        return interp::interp_expr(body.clone(), &env);
+    }
+
+    panic!("no <main> method")
 }
 
 fn typecheck_from_file(filename: &str) -> Result<TEnv, TypeError> {
@@ -102,7 +120,7 @@ fn typecheck_from_file(filename: &str) -> Result<TEnv, TypeError> {
     let filename = String::from(filename);
     let (r, tokbuf) = lex::lex(input).expect("expr failed lexing");
     let (r, ast) = parse::p_defs(tokbuf).expect("expr failed parsing");
-    typecheck::check_program(ast)
+    typecheck::check_program(filename.into(), ast)
 }
 
 fn parse_from_file(filename: &str) -> IResult<TokenBuffer, Vec<Box<Annotated<Defn>>>> {
@@ -133,13 +151,6 @@ fn parse_type(input: &str) -> Type {
 }
 
 // Some random expressions for manual testing
-// println!("{:?}", parse_type("num"));
-// println!("{:?}", parse_type("A"));
-// println!("{:?}", parse_type("A -> B"));
-// println!("{:?}", parse_type("A -> B -> C"));
-// println!("{:?}", parse_type("A -> (B -> C) -> D"));
-// println!("{:?}", parse_type("A -> (B -> C) -> D -> E -> (F -> G -> H)"));
-
 // println!("{:?}", fully_interp_expr("let foo = fn x => y => x + y + 1 in let x = 1 in let y = 2 in foo x y", &env));
 // println!("{:?}", fully_interp_expr("print -1; true", &env));
 // println!("{:?}", fully_interp_expr("let foo = 1 in let bar = 2 in foo", &env));

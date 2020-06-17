@@ -60,41 +60,6 @@ where
     pub infix_r: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
 }
 
-// TODO: make this a macro
-impl<I, O> Mixes<I, O>
-where
-    I: Clone + 'static,
-    O: Clone + 'static,
-{
-    pub fn new_infix_l(
-        levels: &mut HashMap<usize, Rc<Mixes<I, O>>>,
-        precedence: usize,
-        parser: Rc<Box<dyn Parser<I, Box<dyn BinOp<O>>>>>,
-    ) {
-        levels.insert(
-            precedence,
-            Rc::new(Mixes {
-                infix_l: parser,
-                ..Mixes::default()
-            }),
-        );
-    }
-
-    pub fn new_prefix(
-        levels: &mut HashMap<usize, Rc<Mixes<I, O>>>,
-        precedence: usize,
-        parser: Rc<Box<dyn Parser<I, Box<dyn UnOp<O>>>>>,
-    ) {
-        levels.insert(
-            precedence,
-            Rc::new(Mixes {
-                prefix: parser,
-                ..Mixes::default()
-            }),
-        );
-    }
-}
-
 impl<I, O> Default for Mixes<I, O>
 where
     I: Clone + 'static,
@@ -184,7 +149,6 @@ where
     ) -> Rc<dyn Parser<I, O>> {
         let mixes_c = mixes.clone();
         let next_level_c = next_level.clone();
-
         Rc::new(alt((
             bind(next_level.clone(), move |lhs| {
                 box alt((
@@ -254,7 +218,8 @@ where
     ) -> impl Parser<I, O> {
         bind(mixes.infix_r.clone(), move |f| {
             let lhs = lhs.clone();
-            box bind(next_level.clone(), move |rhs| {
+            let infr = MixfixParser::level_infr(mixes.clone(), next_level.clone());
+            box bind(Rc::new(infr), move |rhs| {
                 box unit(f(lhs.clone(), rhs.clone()))
             })
         })
@@ -265,7 +230,6 @@ where
     ) -> impl Parser<I, O> {
         let mixes_c = mixes.clone();
         let next_level_c = next_level.clone();
-
         let level_infr_after_one = bind(next_level.clone(), move |lhs| {
             box alt((
                 MixfixParser::level_infr_after_one(

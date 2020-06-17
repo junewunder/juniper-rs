@@ -34,15 +34,3 @@ foldl f b as = {
     Cons(a, as) => f a (foldl<A, B> f b as),
   }
 }
-
-plus : num -> num -> num;
-plus a b = { a + b }
-
-main : () -> any;
-main () = {
-  let list = Cons<num> 1 (Cons<num> 2 (Cons<num> 3 Root<num>)) in (
-    map<num, num> (plus 1) list;
-    foldr<num, num> plus 0 list;
-    foldl<num, num> plus 0 list;
-  )
-}

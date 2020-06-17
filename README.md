@@ -21,13 +21,37 @@ An interesting part of this repository is a mixfix parser (located in `src/mixfi
 
 ## features to do:
 
- - error reporting on parsing
+ - traits
  - modules
- - top level constants -> create BlockV which is closure but without arguments
+ - type inference
+ - parser errors
+
  - REPL functionality
+ - scoped types?
  - parse values from command line to main function
  - detect when mut value is trying to be used without being dereferenced
- - use Weak reference counting in CloV?
  - mutable struct values
- - bug: variable names that conatain keywords can't be parsed
- - scoped types?
+ - bug: variable names that start with keywords can't be parsed
+
+## plan for generics
+add types GenericT(t, var) and ConcreteT(t, val)
+assume there is a type: T x y z, which should be instantiated to T num string bool
+ - x = num
+ - y = string
+ - z = bool
+then the type AST will be
+```
+ConcreteT(
+  ConcreteT(
+    ConcreteT(
+      GenericT(
+        GenericT(
+          GenericT(
+              ...T...
+            , "z")
+          , "y")
+        , "x")
+      , num)
+    , string)
+  , bool)
+```

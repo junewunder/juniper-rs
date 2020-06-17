@@ -13,8 +13,9 @@ type StructFields = HashMap<String, Type>;
 pub enum Defn {
     VarD(String, Vec<String>, Type, Wrap<Expr>),
     PrimD(String, Vec<String>),
-    StructD(String, StructFields),
-    EnumD(String, HashMap<String, Vec<Type>>),
+    StructD(String, Vec<String>/*generics*/, StructFields),
+    EnumD(String, Vec<String>/*generics*/, HashMap<String, Vec<Type>>),
+    ImportD(String),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,7 +47,6 @@ pub enum Expr {
 
     SeqE(Wrap<Expr>, Wrap<Expr>),
 
-    NewE(Wrap<Expr>, Vec<(String, Wrap<Expr>)>),
     AccessE(Wrap<Expr>, String),
 
     WhileE(Wrap<Expr>, Wrap<Expr>),
@@ -59,6 +59,8 @@ pub enum Expr {
     InitEnumVariantE(String, String, Vec<String>),
 
     MatchE(Wrap<Expr>, Vec<(MatchPattern, Wrap<Expr>)>),
+
+    TypeAnnotationE(Wrap<Expr>, Type),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -87,12 +89,13 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     TypeVar(String),
+    GenericT(Box<Type>, String /*var*/),
+    ConcreteT(Box<Type>, Box<Type> /*value*/),
     NumT,
     BoolT,
     StringT,
     AnyT, // TODO: Remove after type parameterization
     UnitT,
-    UnknownT,
     MutT(Box<Type>),
     RefT(Box<Type>),
     PrimT,
@@ -115,7 +118,7 @@ impl Display for Value {
             CloV(name, arg, expr, env) => {
                 let arg = if arg == "_" { "()" } else { arg };
                 let name = name.clone().unwrap_or("{anon}".to_string());
-                write!(f, "<fn {} :: {} {}>", name, arg, print_env(env))
+                write!(f, "<fn {} : {} {}>", name, arg, print_env(env))
             }
             ObjectV(name, fields) => {
                 let name = name
@@ -158,14 +161,25 @@ impl Display for Type {
             TypeVar(name) => write!(f, "{}", name),
             MutT(m) => write!(f, "mut {}", m),
             RefT(m) => write!(f, "ref {}", m),
-            CloT(i, o) => {
-                write!(f, "{} -> {}", i, o)
-            }
+            CloT(box CloT(ii, io), o) => write!(f, "({} -> {}) -> {}", ii, io, o),
+            CloT(i, o) => write!(f, "{} -> {}", i, o),
+            GenericT(t, name) => write!(f, "∀ {}. ({})", name, t),
+            ConcreteT(t1, t2) => write!(f, "{} {}", t1, t2),
+            EnumT(name, fields) => {
+                let mut fields = fields.clone().into_iter()
+                    .map(|(k, ts)| { format!("{} {}, ", k, ts.iter().map(|t| format!("{} ", t)).collect::<String>()) })
+                    .collect::<Vec<_>>();
+                fields.sort();
+                let fields = fields.into_iter().collect::<String>();
+                write!(f, "enum {} {{ {} }}", name, fields.trim_end_matches(" , "))
+            },
+            StructT(name, _) => write!(f, "struct {}", name),
             x => write!(f, "{:?}", x),
         }
     }
 }
 
+// TODO make this the fn_iter method instead of this
 impl IntoIterator for Type {
     type Item = Type;
     type IntoIter = TypeIterator;
@@ -235,7 +249,7 @@ pub fn print_tenv(env: &TEnv) -> String {
     env_str + "\n}"
 }
 
-pub fn print_env(env: &Rc<Env>) -> String {
+pub fn print_env(env: &Env) -> String {
     let mut env_str = format!("env {{ ");
     for (k, v) in env.iter() {
         match v {
