@@ -13,6 +13,7 @@ use nom::error::{
 pub type ParseError = AnnotatedError<ParseErrorKind>;
 pub type TypeError = AnnotatedError<TypeErrorKind>;
 pub type InterpError = AnnotatedError<InterpErrorKind>;
+pub type CompileError = AnnotatedError<CompileErrorKind>;
 
 #[derive(Debug, Clone)]
 pub struct AnnotatedError<ErrorKind> {
@@ -46,6 +47,19 @@ pub enum TypeErrorKind {
     UnimplementedBehavior,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum CompileErrorKind {
+    CompileTempFiller(i32),
+    DynamicTypeError,
+    StaticTypeError(TypeErrorKind),
+    UndefinedError(String),
+    DerefError(Value),
+    MissingFieldError(String),
+    ExtraFieldError(String),
+    NoMatchError(Value),
+    UnimplementedBehavior,
+}
+
 #[derive(Debug, Clone)]
 pub enum ParseErrorKind {
     NomError(NomErrorKind),
@@ -76,6 +90,18 @@ impl fmt::Display for InterpErrorKind {
         use InterpErrorKind::*;
         match self.clone() {
             TypeError => write!(f, "Type Error"),
+            UndefinedError(name) => write!(f, "Undefined variable \"{}\"", name),
+            DerefError(value) => write!(f, "Value cannot be dereferenced \"{}\"", value),
+            x => write!(f, "{:?}", x),
+        }
+    }
+}
+
+impl fmt::Display for CompileErrorKind {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        use CompileErrorKind::*;
+        match self.clone() {
+            DynamicTypeError => write!(f, "Dynamic Type Error"),
             UndefinedError(name) => write!(f, "Undefined variable \"{}\"", name),
             DerefError(value) => write!(f, "Value cannot be dereferenced \"{}\"", value),
             x => write!(f, "{:?}", x),
@@ -148,6 +174,17 @@ impl From<TypeError> for InterpError {
     fn from(error: TypeError) -> Self {
         AnnotatedError {
             kind: InterpErrorKind::StaticTypeError(error.kind),
+            idx: error.idx,
+            len: error.len,
+            loc: error.loc,
+        }
+    }
+}
+
+impl From<TypeError> for CompileError {
+    fn from(error: TypeError) -> Self {
+        AnnotatedError {
+            kind: CompileErrorKind::StaticTypeError(error.kind),
             idx: error.idx,
             len: error.len,
             loc: error.loc,

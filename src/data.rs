@@ -20,7 +20,7 @@ pub enum Defn {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Expr {
-    NumE(f64),
+    NumE(f32),
     PlusE(Wrap<Expr>, Wrap<Expr>),
     MinusE(Wrap<Expr>, Wrap<Expr>),
     MultE(Wrap<Expr>, Wrap<Expr>),
@@ -68,12 +68,12 @@ pub enum MatchPattern {
     VariantPat(String, Vec<MatchPattern>),
     AnyPat(String),
     StringPat(String),
-    NumPat(f64),
+    NumPat(f32),
 }
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Value {
-    NumV(f64),
+    NumV(f32),
     BoolV(bool),
     StringV(String),
     MutV(Rc<RefCell<Box<Value>>>),

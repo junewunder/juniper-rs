@@ -65,7 +65,7 @@ pub enum Token {
     Prim(String),
     Str(String),
     Space,
-    Num(f64),
+    Num(f32),
     Comment,
     Ident(String),
 }
@@ -80,7 +80,7 @@ pub fn lex(input: &str) -> IResult<&str, TokenBuffer> {
             p_reserved,
             p_ident,
             map(is_a(" \t\n\r"), |x| Token::Space),
-            map(double, |i| Token::Num(i)),
+            map(double, |i| Token::Num(i as f32)),
         ))(i)
     };
 
